@@ -230,12 +230,15 @@
             <button onclick="closeRelationDetail()" style="margin-top: 20px; padding: 12px 20px; background: #999; color: white; border: none; border-radius: 8px; font-size: var(--fs-md); cursor: pointer;">キャンセル</button>
           </div>
         </div>
+        <div id="relation-selected" style="text-align: center; margin-top: 20px; font-size: var(--fs-lg); font-weight: 600; color: var(--color-primary); min-height: 40px;">
+        </div>
         <div style="text-align: center; margin-top: 20px;">
           <button class="btn-large" id="relation-submit-btn" onclick="submitRelation()" disabled>つぎへ</button>
         </div>
         <button class="reset-button" onclick="goTop()">最初に戻る</button>
       </section>
       <section class="screen" id="screen-count">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
         <button class="reset-button" onclick="goTop()">最初に戻る</button>
         <div class="screen-content">
           <div style="font-size: var(--fs-md); font-weight: 600; margin-bottom: 20px;">面会される方は何名さまですか？</div>
@@ -284,6 +287,7 @@
         <button class="reset-button" onclick="goTop()">最初に戻る</button>
       </section>
       <section class="screen" id="screen-complete">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
         <div class="screen-content">
           <div class="complete-title">受付が完了しました</div>
           <div id="visit-pass">
@@ -417,6 +421,13 @@
           resetAppState();
         } else if (screenId === 'screen-room') {
           AppState.inputBuffer = '';
+        } else if (screenId === 'screen-count' && AppState.visitorCount) {
+          document.querySelectorAll('.count-btn').forEach(btn => {
+            if (btn.textContent.includes(AppState.visitorCount + '名')) {
+              btn.style.backgroundColor = 'var(--color-primary)';
+              btn.style.color = 'white';
+            }
+          });
         }
         updateInputDisplay();
         if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete') startIdleTimer();
@@ -440,6 +451,7 @@
       AppState.lastVisitRecord = null;
       hasSignature = false;
       if (signatureCanvas) clearSignature();
+      document.getElementById('relation-selected').textContent = '';
     }
 
     function goTop() { resetAppState(); showScreen('screen-top'); }
@@ -886,11 +898,15 @@
 
     function closeRelationDetail() {
       document.getElementById('relation-detail-modal').style.display = 'none';
+      if (AppState.relation) {
+        document.getElementById('relation-selected').textContent = '選択済み：' + AppState.relation;
+      }
     }
 
     function selectRelation(value) {
       AppState.relation = value;
       document.getElementById('relation-submit-btn').disabled = false;
+      document.getElementById('relation-selected').textContent = '選択済み：' + value;
     }
 
     function submitRelation() {
@@ -903,6 +919,15 @@
 
     function selectCount(n) {
       AppState.visitorCount = n;
+      document.querySelectorAll('.count-btn').forEach(btn => {
+        if (btn.textContent.includes(n + '名')) {
+          btn.style.backgroundColor = 'var(--color-primary)';
+          btn.style.color = 'white';
+        } else {
+          btn.style.backgroundColor = '';
+          btn.style.color = '';
+        }
+      });
       if (AppState.mode === 'new') {
         showScreen('screen-phone');
       } else {
