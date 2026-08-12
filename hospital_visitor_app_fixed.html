@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>病院面会受付システム</title>
+  <style>
+    :root {
+      --color-bg: #FFFFFF;
+      --color-text: #111111;
+      --color-text-sub: #444444;
+      --color-primary: #4A9B6F;
+      --color-primary-dark: #2D6E48;
+      --color-primary-light: #E8F5E9;
+      --color-border: #4A9B6F;
+      --color-alert: #C62828;
+      --color-disabled-bg: #E0E0E0;
+      --color-disabled-text: #9E9E9E;
+      --fs-display: 96px;
+      --fs-huge: 72px;
+      --fs-xl: 56px;
+      --fs-lg: 44px;
+      --fs-md: 34px;
+      --fs-sm: 26px;
+      --fs-xs: 20px;
+      --btn-h-jumbo: 200px;
+      --btn-h-large: 120px;
+      --key-size: 140px;
+      --kana-size: 90px;
+      --radius: 16px;
+      --border-w: 4px;
+      --gap: 20px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    body { margin: 0; padding: 0; font-family: -apple-system, "Hiragino Sans", "ヒラギノ角ゴシック", sans-serif; background-color: var(--color-bg); color: var(--color-text); font-size: 16px; line-height: 1.5; }
+    #app { width: 100vw; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    #app-header { background-color: var(--color-primary); color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-sm); flex-shrink: 0; font-weight: 600; }
+    #header-title { font-size: var(--fs-md); }
+    #header-clock { font-size: var(--fs-xs); }
+    #screen-container { flex: 1; overflow: hidden; position: relative; }
+    .screen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; padding: 40px; overflow-y: auto; }
+    .screen.is-active { display: flex; z-index: 10; }
+    .screen-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+    button { font-family: inherit; border: var(--border-w) solid var(--color-border); background-color: var(--color-bg); color: var(--color-primary); border-radius: var(--radius); cursor: pointer; touch-action: manipulation; transition: none; font-weight: 600; }
+    button:active { background-color: var(--color-primary); color: white; }
+    button:disabled { background-color: var(--color-disabled-bg); color: var(--color-disabled-text); border-color: var(--color-disabled-bg); cursor: not-allowed; }
+    .btn-large { padding: 20px; font-size: var(--fs-lg); min-height: var(--btn-h-large); display: flex; align-items: center; justify-content: center; }
+    .btn-jumbo { width: 80%; height: var(--btn-h-jumbo); font-size: var(--fs-lg); margin: 15px 0; }
+    .back-button { position: absolute; left: 20px; top: 20px; font-size: var(--fs-xs); padding: 12px 16px; color: var(--color-text-sub); border-color: var(--color-text-sub); }
+    .reset-button { position: absolute; right: 20px; top: 20px; font-size: var(--fs-xs); padding: 12px 16px; color: var(--color-text-sub); border-color: var(--color-text-sub); }
+    .numpad-container { display: flex; flex-direction: column; gap: var(--gap); margin-bottom: 30px; }
+    .numpad-row { display: flex; gap: var(--gap); justify-content: center; }
+    .numpad-btn { width: var(--key-size); height: var(--key-size); font-size: var(--fs-xl); padding: 0; }
+    .kana-row { display: flex; gap: var(--gap); justify-content: center; }
+    .kana-btn { width: var(--kana-size); height: var(--kana-size); font-size: var(--fs-lg); padding: 0; }
+    .input-display { font-size: var(--fs-huge); letter-spacing: 12px; text-align: center; min-height: 80px; padding: 20px; border: var(--border-w) solid var(--color-border); border-radius: var(--radius); margin-bottom: 30px; width: 80%; background-color: var(--color-primary-light); }
+    .message-box { text-align: center; font-size: var(--fs-md); margin: 20px 0; padding: 20px; width: 80%; }
+    #signature-canvas { border: 2px solid var(--color-border); border-radius: var(--radius); background-color: white; width: 900px; height: 280px; display: block; margin: 20px 0; }
+    .relation-buttons { display: flex; flex-direction: column; gap: var(--gap); width: 90%; margin-bottom: 20px; }
+    .relation-row { display: flex; gap: var(--gap); justify-content: center; width: 100%; }
+    .relation-btn { flex: 1; min-width: 200px; padding: 30px 20px; font-size: var(--fs-lg); }
+    .relation-btn.is-selected { background-color: var(--color-primary); color: white; }
+    #relation-other-wrap { display: none; width: 80%; margin-top: 20px; }
+    #relation-other-input { width: 100%; padding: 16px; font-size: var(--fs-md); border: var(--border-w) solid var(--color-border); border-radius: var(--radius); font-family: inherit; }
+    .count-buttons { display: flex; gap: var(--gap); justify-content: center; flex-wrap: wrap; }
+    .count-btn { width: 150px; height: 150px; font-size: var(--fs-lg); padding: 0; }
+    #visit-pass { border: 2px solid var(--color-border); padding: 20px; background-color: white; border-radius: var(--radius); width: 100%; max-width: 600px; margin: 20px 0; }
+    .pass-room { font-size: var(--fs-huge); font-weight: 900; text-align: center; margin: 10px 0; }
+    .pass-name { font-size: var(--fs-xl); font-weight: 900; text-align: center; }
+    .pass-sign { text-align: center; margin: 10px 0; }
+    .pass-sign img { max-width: 300px; max-height: 100px; }
+    .pass-id { text-align: center; font-size: var(--fs-md); font-weight: 600; margin-top: 10px; }
+    .no-print { display: block; }
+    @media print {
+      body * { visibility: hidden; }
+      #visit-pass, #visit-pass * { visibility: visible; }
+      #visit-pass { position: absolute; left: 0; top: 0; width: 90mm; height: 60mm; padding: 4mm; box-sizing: border-box; border: none; background: #fff; color: #000; font-size: 11pt; }
+      #visit-pass .pass-room { font-size: 20pt; font-weight: 900; }
+      #visit-pass .pass-name { font-size: 24pt; font-weight: 900; }
+      #visit-pass .pass-sign img { max-width: 60mm; max-height: 15mm; }
+      .no-print { display: none !important; }
+      @page { size: 90mm 60mm; margin: 0; }
+    }
+    .confirm-card { border: var(--border-w) solid var(--color-border); padding: 30px; border-radius: var(--radius); background-color: var(--color-primary-light); margin: 20px 0; width: 80%; text-align: center; }
+    .confirm-room { font-size: var(--fs-lg); margin: 10px 0; }
+    .confirm-name { font-size: var(--fs-md); margin: 10px 0; }
+    .restricted-message { font-size: var(--fs-display); font-weight: 900; color: var(--color-alert); text-align: center; margin: 40px 0; }
+    .restricted-sub { font-size: var(--fs-md); text-align: center; margin: 20px 0; }
+    .narrowing-options { display: flex; gap: var(--gap); justify-content: center; flex-wrap: wrap; margin: 30px 0; }
+    .narrow-btn { width: 140px; height: 140px; font-size: var(--fs-xl); padding: 0; }
+    .two-button-row { display: flex; gap: var(--gap); justify-content: center; width: 100%; margin-top: 20px; }
+    .btn-confirm { flex: 1; padding: 20px; font-size: var(--fs-lg); min-height: var(--btn-h-large); }
+    .timer-text { font-size: var(--fs-xs); color: var(--color-text-sub); margin-top: 20px; }
+    .complete-title { font-size: var(--fs-md); font-weight: 600; margin: 20px 0; }
+    textarea { font-size: var(--fs-md); padding: 12px; border: var(--border-w) solid var(--color-border); border-radius: var(--radius); font-family: inherit; }
+    .help-text { font-size: var(--fs-xs); color: var(--color-text-sub); margin-top: 10px; text-align: center; }
+    .warning-icon { font-size: 80px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header id="app-header" class="no-print">
+      <div id="header-title">○○病院　面会受付</div>
+      <div id="header-clock">2026年8月10日(月) 14時30分</div>
+    </header>
+    <main id="screen-container">
+      <section class="screen is-active" id="screen-top">
+        <div class="screen-content">
+          <h1 style="font-size: var(--fs-md); margin-bottom: 40px;">面会の方法をお選びください</h1>
+          <button class="btn-jumbo" onclick="startNewFlow()"><div style="text-align: center;"><div style="font-size: var(--fs-md); margin-bottom: 10px;">初めて（または久しぶり）の面会</div><div style="font-size: var(--fs-xs); color: var(--color-text-sub);">お部屋番号とお名前からご登録します</div></div></button>
+          <button class="btn-jumbo" onclick="startRepeatFlow()"><div style="text-align: center;"><div style="font-size: var(--fs-md); margin-bottom: 10px;">2回目以降の面会</div><div style="font-size: var(--fs-xs); color: var(--color-text-sub);">お電話番号ですぐに受付できます</div></div></button>
+          <div style="text-align: center; margin-top: 50px; font-size: var(--fs-xs); color: var(--color-text-sub);">お困りの際は1階受付窓口へお声がけください</div>
+        </div>
+      </section>
+      <section class="screen" id="screen-room">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">お部屋番号を入力してください</div>
+        <div class="screen-content">
+          <div class="input-display" id="room-display">-</div>
+          <div class="numpad-container" id="numpad-room"></div>
+          <button class="btn-large" id="room-submit-btn" onclick="submitRoom()" disabled>つぎへ</button>
+        </div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-kana">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;"><span id="kana-room-display">301号室</span> 患者さまの【苗字】をひらがなで入力</div>
+        <div class="screen-content">
+          <div class="input-display" id="kana-display">-</div>
+          <div id="search-message" class="message-box"></div>
+          <div id="kana-keyboard"></div>
+          <div style="display: flex; gap: var(--gap); margin-top: 20px;">
+            <button class="btn-large" onclick="clearInput()">訂正</button>
+            <button class="btn-large" onclick="backspaceInput()">←</button>
+            <button class="btn-large" id="kana-submit-btn" onclick="submitKana()" disabled>さがす</button>
+          </div>
+        </div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-narrow">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;" id="narrow-title">患者さまを選択してください</div>
+        <div class="screen-content"><div id="narrow-options" class="narrowing-options"></div></div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-confirm">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">患者さまをご確認ください</div>
+        <div class="screen-content">
+          <div style="font-size: var(--fs-md); margin-bottom: 30px;">こちらの方でお間違いありませんか？</div>
+          <div id="confirm-content" class="confirm-card"></div>
+          <div class="two-button-row">
+            <button class="btn-confirm" onclick="goBack()">ちがいます</button>
+            <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="confirmPatient()">はい、進む</button>
+          </div>
+        </div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-blocked">
+        <div class="screen-content">
+          <div class="warning-icon">⚠</div>
+          <div style="font-size: var(--fs-md); margin: 20px 0; text-align: center;">恐れ入りますが</div>
+          <div class="restricted-message">1階 受付窓口へ<br>お越しください</div>
+          <div class="restricted-sub">係の者がご案内いたします</div>
+          <button class="btn-large no-print" onclick="goTop()">最初に戻る</button>
+          <div class="timer-text">(15秒後に自動で戻ります)</div>
+        </div>
+      </section>
+      <section class="screen" id="screen-sign">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">面会される方のお名前をご記入ください</div>
+        <div class="screen-content">
+          <canvas id="signature-canvas"></canvas>
+          <div class="two-button-row">
+            <button class="btn-confirm" onclick="clearSignature()">書き直す</button>
+            <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" id="sign-submit-btn" onclick="submitSignature()" disabled>かきおわり → つぎへ</button>
+          </div>
+        </div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-relation">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">患者さまとのご関係をお選びください</div>
+        <div class="screen-content">
+          <div class="relation-buttons">
+            <button class="relation-btn btn-large" onclick="selectRelation('配偶者')">配偶者（夫・妻）</button>
+            <div class="relation-row">
+              <button class="relation-btn" onclick="selectRelation('子')" style="flex: 1;">子</button>
+              <button class="relation-btn" onclick="selectRelation('父母')" style="flex: 1;">父母</button>
+            </div>
+            <div class="relation-row">
+              <button class="relation-btn" onclick="selectRelation('孫')" style="flex: 1;">孫</button>
+              <button class="relation-btn" onclick="selectRelation('祖父母')" style="flex: 1;">祖父母</button>
+              <button class="relation-btn" onclick="selectRelation('兄弟姉妹')" style="flex: 1;">兄弟姉妹</button>
+            </div>
+            <button class="relation-btn btn-large" onclick="selectRelation('その他')">その他</button>
+          </div>
+          <div id="relation-other-wrap">
+            <textarea id="relation-other-input" placeholder="ご関係をご記入ください" maxlength="20"></textarea>
+          </div>
+          <button class="btn-large" id="relation-submit-btn" onclick="submitRelation()" disabled>つぎへ</button>
+        </div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-count">
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+        <div class="screen-content">
+          <div style="font-size: var(--fs-md); font-weight: 600; margin-bottom: 20px;">面会される方は何名さまですか？</div>
+          <div class="count-buttons">
+            <button class="count-btn" onclick="selectCount(1)">1名</button>
+            <button class="count-btn" onclick="selectCount(2)">2名</button>
+            <button class="count-btn" onclick="selectCount(3)">3名</button>
+          </div>
+        </div>
+      </section>
+      <section class="screen" id="screen-phone">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">お電話番号をご入力ください</div>
+        <div class="screen-content">
+          <div style="font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 20px;">次回から受付が早くなります</div>
+          <div class="input-display" id="phone-display">-</div>
+          <div class="help-text">携帯電話またはご自宅の電話番号を10桁または11桁でご入力ください</div>
+          <div class="numpad-container" id="numpad-phone"></div>
+          <button class="btn-large" id="phone-submit-btn" onclick="submitPhone()" disabled>つぎへ</button>
+        </div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-repeat-phone">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">お電話番号をご入力ください</div>
+        <div class="screen-content">
+          <div style="font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 20px;">前回ご登録いただいたお電話番号をご入力ください</div>
+          <div class="input-display" id="repeat-phone-display">-</div>
+          <div id="repeat-phone-message" class="message-box"></div>
+          <div class="numpad-container" id="numpad-repeat-phone"></div>
+          <button class="btn-large" id="repeat-phone-submit-btn" onclick="submitRepeatPhone()" disabled>つぎへ</button>
+        </div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-repeat-confirm">
+        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">ご来院ありがとうございます</div>
+        <div class="screen-content">
+          <div id="repeat-confirm-content" class="confirm-card"></div>
+          <div id="repeat-transfer-note" class="help-text" style="color: var(--color-alert);"></div>
+          <div class="two-button-row">
+            <button class="btn-confirm" onclick="showScreen('screen-sign')">書き直す</button>
+            <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="showScreen('screen-count')">このまま進む</button>
+          </div>
+        </div>
+        <button class="reset-button" onclick="goTop()">最初に戻る</button>
+      </section>
+      <section class="screen" id="screen-complete">
+        <div class="screen-content">
+          <div class="complete-title">受付が完了しました</div>
+          <div id="visit-pass">
+            <div style="border-bottom: 1px solid var(--color-border); padding-bottom: 10px;">
+              <div style="font-size: var(--fs-md); font-weight: 600;">○○病院　面会証</div>
+            </div>
+            <div class="pass-room" id="pass-room">301号室</div>
+            <div class="pass-name" id="pass-name">山田　様</div>
+            <div style="margin: 10px 0; font-size: var(--fs-sm);">面会者： <span id="pass-visitor"></span></div>
+            <div class="pass-sign" id="pass-sign"></div>
+            <div style="margin: 10px 0; font-size: var(--fs-sm);">ご関係： <span id="pass-relation"></span></div>
+            <div style="margin: 10px 0; font-size: var(--fs-sm);">人数： <span id="pass-count"></span></div>
+            <div style="border-top: 1px solid var(--color-border); padding-top: 10px; margin-top: 10px;">
+              <div id="pass-time" style="text-align: center; font-size: var(--fs-xs); margin: 10px 0;"></div>
+              <div class="pass-id" id="pass-id"></div>
+            </div>
+          </div>
+          <div class="two-button-row no-print" style="margin-top: 40px;">
+            <button class="btn-confirm" onclick="printLabel()">面会証を印刷する</button>
+            <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="goTop()">終了して最初に戻る</button>
+          </div>
+          <div class="timer-text">(20秒後に自動で最初の画面に戻ります)</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const KANA_NORMALIZE_MAP = {
+      'が':'か', 'ぎ':'き', 'ぐ':'く', 'げ':'け', 'ご':'こ',
+      'ざ':'さ', 'じ':'し', 'ず':'す', 'ぜ':'せ', 'ぞ':'そ',
+      'だ':'た', 'ぢ':'ち', 'づ':'つ', 'で':'て', 'ど':'と',
+      'ば':'は', 'び':'ひ', 'ぶ':'ふ', 'べ':'へ', 'ぼ':'ほ',
+      'ぱ':'は', 'ぴ':'ひ', 'ぷ':'ふ', 'ぺ':'へ', 'ぽ':'ほ',
+      'ぁ':'あ', 'ぃ':'い', 'ぅ':'う', 'ぇ':'え', 'ぉ':'お',
+      'っ':'つ', 'ゃ':'や', 'ゅ':'ゆ', 'ょ':'よ', 'ゎ':'わ'
+    };
+
+    const SEED_PATIENT_MASTER = [
+      { patientId: "P0001", roomNo: "301", lastNameKana: "やまだ", firstNameKana: "たろう", lastNameKanji: "山田", initial: "T.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0002", roomNo: "301", lastNameKana: "さとう", firstNameKana: "はなこ", lastNameKanji: "佐藤", initial: "H.S.", restricted: false, restrictReason: "" },
+      { patientId: "P0003", roomNo: "302", lastNameKana: "すずき", firstNameKana: "いちろう", lastNameKanji: "鈴木", initial: "I.S.", restricted: true, restrictReason: "面会禁止" },
+      { patientId: "P0004", roomNo: "302", lastNameKana: "たなか", firstNameKana: "よしお", lastNameKanji: "田中", initial: "Y.T.", restricted: false, restrictReason: "" },
+      { patientId: "P0005", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "じろう", lastNameKanji: "山田", initial: "J.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0006", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "さぶろう", lastNameKanji: "山田", initial: "S.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0007", roomNo: "303", lastNameKana: "こばやし", firstNameKana: "みつこ", lastNameKanji: "小林", initial: "M.K.", restricted: false, restrictReason: "" },
+      { patientId: "P0008", roomNo: "401", lastNameKana: "わたなべ", firstNameKana: "けんじ", lastNameKanji: "渡辺", initial: "K.W.", restricted: false, restrictReason: "" },
+      { patientId: "P0009", roomNo: "401", lastNameKana: "いとう", firstNameKana: "あきこ", lastNameKanji: "伊藤", initial: "A.I.", restricted: true, restrictReason: "面会禁止" },
+      { patientId: "P0010", roomNo: "402", lastNameKana: "なかむら", firstNameKana: "しげる", lastNameKanji: "中村", initial: "S.N.", restricted: false, restrictReason: "" },
+      { patientId: "P0011", roomNo: "402", lastNameKana: "やまもと", firstNameKana: "ふみえ", lastNameKanji: "山本", initial: "F.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0012", roomNo: "403", lastNameKana: "かとう", firstNameKana: "まさし", lastNameKanji: "加藤", initial: "M.K.", restricted: false, restrictReason: "" },
+      { patientId: "P0013", roomNo: "403", lastNameKana: "よしだ", firstNameKana: "のぶお", lastNameKanji: "吉田", initial: "N.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0014", roomNo: "501", lastNameKana: "ささき", firstNameKana: "ともこ", lastNameKanji: "佐々木", initial: "T.S.", restricted: false, restrictReason: "" },
+      { patientId: "P0015", roomNo: "501", lastNameKana: "やまぐち", firstNameKana: "たけし", lastNameKanji: "山口", initial: "T.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0016", roomNo: "502", lastNameKana: "まつもと", firstNameKana: "きよし", lastNameKanji: "松本", initial: "K.M.", restricted: false, restrictReason: "" },
+      { patientId: "P0017", roomNo: "502", lastNameKana: "いのうえ", firstNameKana: "みどり", lastNameKanji: "井上", initial: "M.I.", restricted: false, restrictReason: "" },
+      { patientId: "P0018", roomNo: "503", lastNameKana: "きむら", firstNameKana: "ひろし", lastNameKanji: "木村", initial: "H.K.", restricted: true, restrictReason: "面会禁止" },
+      { patientId: "P0019", roomNo: "503", lastNameKana: "はやし", firstNameKana: "かずえ", lastNameKanji: "林", initial: "K.H.", restricted: false, restrictReason: "" },
+      { patientId: "P0020", roomNo: "503", lastNameKana: "しみず", firstNameKana: "ゆうじ", lastNameKanji: "清水", initial: "Y.S.", restricted: false, restrictReason: "" }
+    ];
+
+    let AppState = {
+      currentScreen: 'top',
+      mode: null,
+      inputBuffer: '',
+      roomNo: '',
+      kanaBuffer: '',
+      candidates: [],
+      selectedPatient: null,
+      signatureData: null,
+      relation: null,
+      relationOther: '',
+      visitorCount: null,
+      phoneNumber: '',
+      entryType: null,
+      lastVisitRecord: null,
+      idleTimerId: null
+    };
+
+    let hasSignature = false;
+    let signatureCanvas = null;
+    let signatureCtx = null;
+    let isDrawing = false;
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('is-active'));
+      const screen = document.getElementById(screenId);
+      if (screen) {
+        screen.classList.add('is-active');
+        AppState.currentScreen = screenId;
+        if (screenId === 'screen-sign') setTimeout(() => initSignatureCanvas(), 100);
+        else if (screenId === 'screen-top') resetAppState();
+        if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete') startIdleTimer();
+        else if (screenId === 'screen-blocked') startBlockedTimer();
+        else if (screenId === 'screen-complete') startCompleteTimer();
+      }
+    }
+
+    function resetAppState() {
+      AppState.inputBuffer = '';
+      AppState.roomNo = '';
+      AppState.kanaBuffer = '';
+      AppState.candidates = [];
+      AppState.selectedPatient = null;
+      AppState.signatureData = null;
+      AppState.relation = null;
+      AppState.relationOther = '';
+      AppState.visitorCount = null;
+      AppState.phoneNumber = '';
+      AppState.entryType = null;
+      AppState.lastVisitRecord = null;
+      hasSignature = false;
+      if (signatureCanvas) clearSignature();
+    }
+
+    function goTop() { resetAppState(); showScreen('screen-top'); }
+    function goBack() {
+      if (AppState.currentScreen === 'screen-count') {
+        showScreen(AppState.mode === 'repeat' ? 'screen-repeat-confirm' : 'screen-relation');
+      } else {
+        const map = {
+          'screen-room': 'screen-top',
+          'screen-kana': 'screen-room',
+          'screen-narrow': 'screen-kana',
+          'screen-confirm': 'screen-kana',
+          'screen-sign': 'screen-confirm',
+          'screen-relation': 'screen-sign',
+          'screen-phone': 'screen-count',
+          'screen-repeat-phone': 'screen-top',
+          'screen-repeat-confirm': 'screen-repeat-phone'
+        };
+        const prev = map[AppState.currentScreen];
+        if (prev) showScreen(prev);
+      }
+    }
+
+    function startNewFlow() { AppState.mode = 'new'; AppState.entryType = 'new'; showScreen('screen-room'); }
+    function startRepeatFlow() { AppState.mode = 'repeat'; AppState.entryType = 'repeat'; showScreen('screen-repeat-phone'); }
+
+    function pressKey(char) {
+      const cur = AppState.currentScreen;
+      if (cur === 'screen-room' || cur === 'screen-phone' || cur === 'screen-repeat-phone') {
+        if (AppState.inputBuffer.length < 11) AppState.inputBuffer += char;
+      } else if (cur === 'screen-kana') {
+        if (AppState.kanaBuffer.length < 6) AppState.kanaBuffer += char;
+      }
+      updateInputDisplay();
+    }
+
+    function backspaceInput() {
+      if (AppState.currentScreen === 'screen-kana') AppState.kanaBuffer = AppState.kanaBuffer.slice(0, -1);
+      else AppState.inputBuffer = AppState.inputBuffer.slice(0, -1);
+      updateInputDisplay();
+    }
+
+    function clearInput() { AppState.inputBuffer = ''; AppState.kanaBuffer = ''; updateInputDisplay(); }
+
+    function updateInputDisplay() {
+      if (AppState.currentScreen === 'screen-room') {
+        document.getElementById('room-display').textContent = AppState.inputBuffer || '-';
+        document.getElementById('room-submit-btn').disabled = !AppState.inputBuffer;
+      } else if (AppState.currentScreen === 'screen-kana') {
+        document.getElementById('kana-display').textContent = AppState.kanaBuffer || '-';
+        document.getElementById('kana-submit-btn').disabled = !AppState.kanaBuffer;
+      } else if (AppState.currentScreen === 'screen-phone') {
+        document.getElementById('phone-display').textContent = formatPhoneDisplay(AppState.inputBuffer) || '-';
+        document.getElementById('phone-submit-btn').disabled = !validatePhone(AppState.inputBuffer);
+      } else if (AppState.currentScreen === 'screen-repeat-phone') {
+        document.getElementById('repeat-phone-display').textContent = formatPhoneDisplay(AppState.inputBuffer) || '-';
+        document.getElementById('repeat-phone-submit-btn').disabled = !validatePhone(AppState.inputBuffer);
+      }
+    }
+
+    function normalizeKana(str) {
+      let result = str;
+      for (let key in KANA_NORMALIZE_MAP) {
+        result = result.replace(new RegExp(key, 'g'), KANA_NORMALIZE_MAP[key]);
+      }
+      return result;
+    }
+
+    function formatPhoneDisplay(digits) {
+      if (!digits) return '';
+      if (digits.length <= 3) return digits;
+      if (digits.length <= 7) return digits.slice(0, 3) + '-' + digits.slice(3);
+      return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7);
+    }
+
+    function validatePhone(digits) { return digits.length === 10 || digits.length === 11; }
+
+    function fetchPatientMaster() {
+      try {
+        const stored = localStorage.getItem('vms_patient_master');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+      try {
+        localStorage.setItem('vms_patient_master', JSON.stringify(SEED_PATIENT_MASTER));
+      } catch (e) {}
+      return SEED_PATIENT_MASTER;
+    }
+
+    function getVisitLog() {
+      try {
+        const stored = localStorage.getItem('vms_visit_log');
+        return stored ? JSON.parse(stored) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveVisitLog() {
+      const log = getVisitLog();
+      const now = new Date();
+      log.push({
+        visitId: generateVisitId(),
+        timestamp: now.toISOString(),
+        displayTime: formatTimestamp(now),
+        patientId: AppState.selectedPatient.patientId,
+        roomNo: AppState.selectedPatient.roomNo,
+        patientLastNameKanji: AppState.selectedPatient.lastNameKanji,
+        visitorSignature: AppState.signatureData,
+        relation: AppState.relation,
+        relationOther: AppState.relationOther,
+        visitorCount: AppState.visitorCount,
+        phoneNumber: AppState.phoneNumber,
+        entryType: AppState.entryType
+      });
+      try {
+        localStorage.setItem('vms_visit_log', JSON.stringify(log));
+      } catch (e) {}
+    }
+
+    function generateVisitId() {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0].replace(/-/g, '');
+      const time = now.toTimeString().split(' ')[0].replace(/:/g, '');
+      let seqData = { date: today, seq: 0 };
+      try {
+        const stored = localStorage.getItem('vms_daily_seq');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          seqData.seq = (parsed.date === today ? parsed.seq : 0) + 1;
+          seqData.date = today;
+        } else {
+          seqData.seq = 1;
+          seqData.date = today;
+        }
+        localStorage.setItem('vms_daily_seq', JSON.stringify(seqData));
+      } catch (e) {
+        seqData.seq = 1;
+      }
+      return `V${today}_${time}_${String(seqData.seq).padStart(3, '0')}`;
+    }
+
+    function searchPatientsByLastName(roomNo, kana) {
+      const master = fetchPatientMaster();
+      const normalized = normalizeKana(kana);
+      return master.filter(p => p.roomNo === roomNo && normalizeKana(p.lastNameKana) === normalized);
+    }
+
+    function checkRestriction(patient) { return !patient || patient.restricted === true; }
+
+    function buildNarrowOptions(candidates) {
+      if (candidates.length <= 1) return candidates;
+      const firstChars = new Set(candidates.map(c => c.firstNameKana.charAt(0)));
+      if (firstChars.size === candidates.length) return candidates.map(p => ({...p, label: p.firstNameKana.charAt(0)}));
+      const initials = new Set(candidates.map(c => c.initial));
+      if (initials.size === candidates.length) return candidates.map(p => ({...p, label: p.initial}));
+      return candidates.map(p => ({...p, label: p.firstNameKana}));
+    }
+
+    function renderNumpad(containerId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      const buttons = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['訂正', '0', '←']];
+      buttons.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'numpad-row';
+        row.forEach(label => {
+          const btn = document.createElement('button');
+          btn.className = 'numpad-btn btn-large';
+          btn.textContent = label;
+          if (label === '訂正') btn.onclick = () => clearInput();
+          else if (label === '←') btn.onclick = () => backspaceInput();
+          else btn.onclick = () => pressKey(label);
+          rowDiv.appendChild(btn);
+        });
+        container.appendChild(rowDiv);
+      });
+    }
+
+    function renderKanaKeyboard() {
+      const container = document.getElementById('kana-keyboard');
+      container.innerHTML = '';
+      const kanas = [
+        ['わ', 'ら', 'や', 'ま', 'は', 'な', 'た', 'さ', 'か', 'あ'],
+        ['を', 'り', '', 'み', 'ひ', 'に', 'ち', 'し', 'き', 'い'],
+        ['ん', 'る', 'ゆ', 'む', 'ふ', 'ぬ', 'つ', 'す', 'く', 'う'],
+        ['', 'れ', '', 'め', 'へ', 'ね', 'て', 'せ', 'け', 'え'],
+        ['ー', 'ろ', 'よ', 'も', 'ほ', 'の', 'と', 'そ', 'こ', 'お']
+      ];
+      kanas.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'kana-row';
+        row.forEach(kana => {
+          const btn = document.createElement('button');
+          btn.className = 'kana-btn';
+          btn.textContent = kana;
+          if (kana) btn.onclick = () => pressKey(kana);
+          else btn.style.visibility = 'hidden';
+          rowDiv.appendChild(btn);
+        });
+        container.appendChild(rowDiv);
+      });
+    }
+
+    function renderConfirm() {
+      const p = AppState.selectedPatient;
+      document.getElementById('confirm-content').innerHTML = `<div class="confirm-room">${p.roomNo} 号室</div><div class="confirm-name">${p.lastNameKanji}　様</div>`;
+    }
+
+    function updateClock() {
+      document.getElementById('header-clock').textContent = formatTimestamp(new Date());
+    }
+
+    function formatTimestamp(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      const h = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+      return `${y}年${m}月${d}日(${dayNames[date.getDay()]}) ${h}時${min}分`;
+    }
+
+    function initSignatureCanvas() {
+      if (signatureCanvas) return;
+      signatureCanvas = document.getElementById('signature-canvas');
+      signatureCtx = signatureCanvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = signatureCanvas.getBoundingClientRect();
+      signatureCanvas.width = rect.width * dpr;
+      signatureCanvas.height = rect.height * dpr;
+      signatureCtx.scale(dpr, dpr);
+      signatureCtx.fillStyle = '#FFFFFF';
+      signatureCtx.fillRect(0, 0, rect.width, rect.height);
+      signatureCtx.strokeStyle = '#000000';
+      signatureCtx.lineWidth = 4;
+      signatureCtx.lineCap = 'round';
+      signatureCtx.lineJoin = 'round';
+
+      signatureCanvas.addEventListener('touchstart', (e) => {
+        isDrawing = true;
+        const touch = e.touches[0];
+        const r = signatureCanvas.getBoundingClientRect();
+        signatureCtx.beginPath();
+        signatureCtx.moveTo(touch.clientX - r.left, touch.clientY - r.top);
+      }, { passive: false });
+
+      signatureCanvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isDrawing) return;
+        const touch = e.touches[0];
+        const r = signatureCanvas.getBoundingClientRect();
+        signatureCtx.lineTo(touch.clientX - r.left, touch.clientY - r.top);
+        signatureCtx.stroke();
+        hasSignature = true;
+        document.getElementById('sign-submit-btn').disabled = false;
+      }, { passive: false });
+
+      signatureCanvas.addEventListener('touchend', () => { isDrawing = false; });
+      signatureCanvas.addEventListener('mousedown', (e) => {
+        isDrawing = true;
+        const r = signatureCanvas.getBoundingClientRect();
+        signatureCtx.beginPath();
+        signatureCtx.moveTo(e.clientX - r.left, e.clientY - r.top);
+      });
+      signatureCanvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        const r = signatureCanvas.getBoundingClientRect();
+        signatureCtx.lineTo(e.clientX - r.left, e.clientY - r.top);
+        signatureCtx.stroke();
+        hasSignature = true;
+        document.getElementById('sign-submit-btn').disabled = false;
+      });
+      signatureCanvas.addEventListener('mouseup', () => { isDrawing = false; });
+      signatureCanvas.addEventListener('mouseleave', () => { isDrawing = false; });
+    }
+
+    function clearSignature() {
+      if (!signatureCanvas) return;
+      const rect = signatureCanvas.getBoundingClientRect();
+      signatureCtx.fillStyle = '#FFFFFF';
+      signatureCtx.fillRect(0, 0, rect.width, rect.height);
+      hasSignature = false;
+      document.getElementById('sign-submit-btn').disabled = true;
+    }
+
+    function getSignatureData() { return signatureCanvas ? signatureCanvas.toDataURL('image/png') : null; }
+
+    function printLabel() { window.print(); }
+
+    function startIdleTimer() {
+      if (AppState.idleTimerId) clearTimeout(AppState.idleTimerId);
+      if (AppState.currentScreen === 'screen-top') return;
+      AppState.idleTimerId = setTimeout(() => { goTop(); }, 90000);
+    }
+
+    function resetIdleTimer() { startIdleTimer(); }
+    function startBlockedTimer() {
+      if (AppState.idleTimerId) clearTimeout(AppState.idleTimerId);
+      AppState.idleTimerId = setTimeout(() => { goTop(); }, 15000);
+    }
+    function startCompleteTimer() {
+      if (AppState.idleTimerId) clearTimeout(AppState.idleTimerId);
+      AppState.idleTimerId = setTimeout(() => { goTop(); }, 20000);
+    }
+
+    function submitRoom() {
+      AppState.roomNo = AppState.inputBuffer;
+      AppState.inputBuffer = '';
+      document.getElementById('kana-room-display').textContent = `${AppState.roomNo}号室`;
+      showScreen('screen-kana');
+    }
+
+    function submitKana() {
+      const candidates = searchPatientsByLastName(AppState.roomNo, AppState.kanaBuffer);
+      if (candidates.length === 0) {
+        document.getElementById('search-message').textContent = '該当する方が見つかりませんでした。入力をご確認いただくか、1階受付窓口へお声がけください。';
+      } else if (candidates.length === 1) {
+        AppState.selectedPatient = candidates[0];
+        renderConfirm();
+        showScreen('screen-confirm');
+      } else {
+        AppState.candidates = candidates;
+        const options = buildNarrowOptions(candidates);
+        const container = document.getElementById('narrow-options');
+        container.innerHTML = '';
+        document.getElementById('narrow-title').textContent = `${AppState.selectedPatient ? AppState.selectedPatient.lastNameKanji : candidates[0].lastNameKanji}様が${options.length}名いらっしゃいます。`;
+        options.forEach(opt => {
+          const btn = document.createElement('button');
+          btn.className = 'narrow-btn btn-large';
+          btn.textContent = opt.label;
+          btn.onclick = () => selectNarrowOption(opt.patientId);
+          container.appendChild(btn);
+        });
+        showScreen('screen-narrow');
+      }
+    }
+
+    function selectNarrowOption(patientId) {
+      const patient = AppState.candidates.find(p => p.patientId === patientId);
+      if (patient) {
+        AppState.selectedPatient = patient;
+        renderConfirm();
+        showScreen('screen-confirm');
+      }
+    }
+
+    function confirmPatient() {
+      const master = fetchPatientMaster();
+      const latest = master.find(p => p.patientId === AppState.selectedPatient.patientId);
+      if (checkRestriction(latest)) {
+        showScreen('screen-blocked');
+      } else {
+        showScreen('screen-sign');
+      }
+    }
+
+    function submitSignature() {
+      AppState.signatureData = getSignatureData();
+      showScreen('screen-relation');
+    }
+
+    function selectRelation(value) {
+      AppState.relation = value;
+      const otherWrap = document.getElementById('relation-other-wrap');
+      if (value === 'その他') {
+        otherWrap.style.display = 'block';
+      } else {
+        otherWrap.style.display = 'none';
+        AppState.relationOther = '';
+      }
+      document.querySelectorAll('.relation-btn').forEach(btn => btn.classList.remove('is-selected'));
+      document.querySelectorAll('.relation-btn').forEach(btn => {
+        if (btn.textContent.includes(value)) btn.classList.add('is-selected');
+      });
+      document.getElementById('relation-submit-btn').disabled = false;
+    }
+
+    function submitRelation() {
+      if (AppState.relation === 'その他') {
+        AppState.relationOther = document.getElementById('relation-other-input').value;
+      }
+      showScreen('screen-count');
+    }
+
+    function selectCount(n) {
+      AppState.visitorCount = n;
+      if (AppState.mode === 'new') {
+        showScreen('screen-phone');
+      } else {
+        submitRepeatVisit();
+      }
+    }
+
+    function submitPhone() {
+      AppState.phoneNumber = AppState.inputBuffer;
+      submitNewVisit();
+    }
+
+    function submitRepeatPhone() {
+      AppState.phoneNumber = AppState.inputBuffer;
+      const log = getVisitLog();
+      const rec = log.filter(l => l.phoneNumber === AppState.phoneNumber).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+      if (!rec) {
+        document.getElementById('repeat-phone-message').textContent = 'ご登録が見つかりません。';
+      } else {
+        const master = fetchPatientMaster();
+        const patient = master.find(p => p.patientId === rec.patientId);
+        if (checkRestriction(patient)) {
+          showScreen('screen-blocked');
+        } else {
+          AppState.selectedPatient = patient;
+          AppState.signatureData = rec.visitorSignature;
+          AppState.relation = rec.relation;
+          AppState.relationOther = rec.relationOther;
+          AppState.entryType = 'repeat';
+          showScreen('screen-repeat-confirm');
+        }
+      }
+    }
+
+    function submitNewVisit() {
+      saveVisitLog();
+      const now = new Date();
+      document.getElementById('pass-room').textContent = `${AppState.selectedPatient.roomNo} 号室`;
+      document.getElementById('pass-name').textContent = `${AppState.selectedPatient.lastNameKanji}　様`;
+      if (AppState.signatureData) document.getElementById('pass-sign').innerHTML = `<img src="${AppState.signatureData}">`;
+      document.getElementById('pass-relation').textContent = AppState.relation;
+      document.getElementById('pass-count').textContent = `${AppState.visitorCount}名`;
+      document.getElementById('pass-time').textContent = formatTimestamp(now);
+      document.getElementById('pass-id').textContent = `受付番号 ${generateVisitId()}`;
+      showScreen('screen-complete');
+    }
+
+    function submitRepeatVisit() {
+      saveVisitLog();
+      submitNewVisit();
+    }
+
+    function initApp() {
+      fetchPatientMaster();
+      renderNumpad('numpad-room');
+      renderNumpad('numpad-phone');
+      renderNumpad('numpad-repeat-phone');
+      renderKanaKeyboard();
+      setInterval(updateClock, 1000);
+      updateClock();
+      document.addEventListener('click', resetIdleTimer);
+      document.addEventListener('touchend', resetIdleTimer);
+      showScreen('screen-top');
+    }
+
+    document.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
