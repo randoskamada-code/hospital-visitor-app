@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>病院面会受付システム</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js"></script>
+  <script async src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
     :root {
       --color-bg: #FFFFFF;
@@ -926,7 +926,11 @@
 
     function getSignatureData() { return signatureCanvas ? signatureCanvas.toDataURL('image/png') : null; }
 
-    function printLabel() { window.print(); }
+    function printLabel() {
+      // 印刷ボタン押下時に訪問記録を保存
+      saveVisitLog();
+      window.print();
+    }
 
     function startIdleTimer() {
       if (AppState.idleTimerId) clearTimeout(AppState.idleTimerId);
@@ -951,7 +955,7 @@
         return;
       }
       // 部屋番号が変わったら kanaBuffer をクリア、同じなら保持
-      if (AppState.roomNo !== AppState.inputBuffer) {
+      if (String(AppState.roomNo) !== String(AppState.inputBuffer)) {
         AppState.kanaBuffer = '';
       }
       AppState.roomNo = AppState.inputBuffer;
@@ -1111,9 +1115,14 @@
     }
 
     function submitNewVisit() {
-      saveVisitLog();
+      // saveVisitLog() は printLabel() で呼び出す
       const now = new Date();
       const visitId = generateVisitId();
+      AppState.lastVisitRecord = {
+        visitId: visitId,
+        timestamp: now.toISOString(),
+        displayTime: formatTimestamp(now)
+      };
       document.getElementById('pass-room').textContent = `${AppState.selectedPatient.roomNo} 号室`;
       document.getElementById('pass-name').textContent = `${AppState.selectedPatient.lastNameKanji}　様`;
       if (AppState.signatureData) document.getElementById('pass-sign').innerHTML = `<img src="${AppState.signatureData}">`;
