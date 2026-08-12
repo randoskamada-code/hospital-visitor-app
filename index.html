@@ -342,6 +342,7 @@
       <!-- 管理画面：ダッシュボード -->
       <section class="screen" id="screen-admin-dashboard">
         <button class="back-button" onclick="goTop()">← 戻る</button>
+        <button class="back-button" onclick="loadAdminDashboard()" style="left: auto; right: 80px; background-color: var(--color-primary); color: white; border-color: var(--color-primary);">🔄 更新</button>
         <div style="width: 100%; padding: 20px; overflow-y: auto;">
           <div style="text-align: center; margin-bottom: 20px; font-size: var(--fs-md); font-weight: 600;">訪問者管理ダッシュボード</div>
 
@@ -374,7 +375,8 @@
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">人数</th>
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">入館時間</th>
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">退館時間</th>
-                  <th style="padding: 10px; text-align: left;">状態</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">状態</th>
+                  <th style="padding: 10px; text-align: left;">署名</th>
                 </tr>
               </thead>
               <tbody id="admin-table-body">
@@ -383,6 +385,16 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- 署名表示モーダル -->
+          <div id="signature-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center;">
+            <div style="background: white; padding: 20px; border-radius: 8px; max-width: 600px; text-align: center;">
+              <div style="font-size: var(--fs-md); font-weight: 600; margin-bottom: 15px;">来院者署名</div>
+              <div id="signature-display" style="border: 2px solid var(--color-border); padding: 10px; margin-bottom: 15px; min-height: 200px; display: flex; align-items: center; justify-content: center;">
+              </div>
+              <button onclick="closeSignatureModal()" style="padding: 10px 20px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">閉じる</button>
+            </div>
           </div>
         </div>
       </section>
@@ -542,6 +554,7 @@
       hasSignature = false;
       if (signatureCanvas) clearSignature();
       document.getElementById('relation-selected').textContent = '';
+
       // 完了画面の表示をリセット
       document.getElementById('pass-room').textContent = '';
       document.getElementById('pass-name').textContent = '';
@@ -551,6 +564,12 @@
       document.getElementById('pass-time').textContent = '';
       document.getElementById('pass-id').textContent = '';
       document.getElementById('pass-qr').innerHTML = '';
+
+      // count ボタンのスタイルをリセット
+      document.querySelectorAll('.count-btn').forEach(btn => {
+        btn.style.backgroundColor = '';
+        btn.style.color = '';
+      });
     }
 
     function goTop() { resetAppState(); showScreen('screen-top'); }
@@ -616,18 +635,22 @@
         const patientName = patient ? patient.lastNameKanji : '不明';
         const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
         const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
+        const visitorName = entry.visitorSignature ? '署名あり' : '署名なし';
 
         return `
           <tr style="border-bottom: 1px solid #ddd;">
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitId}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${patientName}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.roomNo}号室</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">-</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${visitorName}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.relation}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitorCount}名</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.displayTime}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
-            <td style="padding: 8px; background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd; background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
+            <td style="padding: 8px; text-align: center;">
+              <button onclick="showSignature('${entry.visitId}')" style="padding: 4px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
+            </td>
           </tr>
         `;
       }).join('');
@@ -635,6 +658,21 @@
 
     function applyAdminFilters() {
       alert('検索・フィルター機能（未実装）');
+    }
+
+    function showSignature(visitId) {
+      const log = getVisitLog();
+      const entry = log.find(e => e.visitId === visitId);
+      if (entry && entry.visitorSignature) {
+        const signatureDisplay = document.getElementById('signature-display');
+        signatureDisplay.innerHTML = `<img src="${entry.visitorSignature}" style="max-width: 100%; max-height: 300px; border-radius: 4px;">`;
+        document.getElementById('signature-modal').style.display = 'flex';
+      }
+    }
+
+    function closeSignatureModal() {
+      document.getElementById('signature-modal').style.display = 'none';
+      document.getElementById('signature-display').innerHTML = '';
     }
 
     function pressKey(char) {
