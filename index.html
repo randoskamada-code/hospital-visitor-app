@@ -349,10 +349,11 @@
           <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center;">
             <select id="admin-filter-floor" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px;">
               <option value="">全フロア</option>
-              <option value="2">2階</option>
               <option value="3">3階</option>
               <option value="4">4階</option>
               <option value="5">5階</option>
+              <option value="6">6階</option>
+              <option value="7">7階</option>
             </select>
             <input type="date" id="admin-filter-date" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px;">
             <input type="text" id="admin-filter-patient" placeholder="患者氏名" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px; width: 120px;">
@@ -949,9 +950,12 @@
         alert('部屋番号は3ケタでご入力ください');
         return;
       }
+      // 部屋番号が変わったら kanaBuffer をクリア、同じなら保持
+      if (AppState.roomNo !== AppState.inputBuffer) {
+        AppState.kanaBuffer = '';
+      }
       AppState.roomNo = AppState.inputBuffer;
       AppState.inputBuffer = '';
-      AppState.kanaBuffer = '';
       document.getElementById('kana-room-display').textContent = `${AppState.roomNo}号室`;
       showScreen('screen-kana');
     }
