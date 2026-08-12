@@ -356,9 +356,9 @@
               <option value="6">6階</option>
               <option value="7">7階</option>
             </select>
+            <input type="text" id="admin-filter-room" placeholder="部屋番号" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px; width: 100px;">
             <input type="date" id="admin-filter-date" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px;">
             <input type="text" id="admin-filter-patient" placeholder="患者氏名" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px; width: 120px;">
-            <input type="text" id="admin-filter-visitor" placeholder="面会者氏名" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px; width: 120px;">
             <button onclick="applyAdminFilters()" style="padding: 8px 16px; font-size: var(--fs-xs); background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">検索</button>
           </div>
 
@@ -370,13 +370,12 @@
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">受付番号</th>
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">患者氏名</th>
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">患者部屋</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">面会者</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">面会者署名</th>
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">関係</th>
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">人数</th>
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">入館時間</th>
                   <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">退館時間</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">状態</th>
-                  <th style="padding: 10px; text-align: left;">署名</th>
+                  <th style="padding: 10px; text-align: left;">状態</th>
                 </tr>
               </thead>
               <tbody id="admin-table-body">
@@ -621,18 +620,28 @@
     }
 
     function loadAdminDashboard() {
+      console.log('loadAdminDashboard が呼ばれました');
       const log = getVisitLog();
       const master = fetchPatientMaster();
       const tbody = document.getElementById('admin-table-body');
 
+      console.log('訪問記録数:', log.length);
+      console.log('tbody 要素:', tbody);
+
+      if (!tbody) {
+        console.error('admin-table-body が見つかりません');
+        return;
+      }
+
       if (log.length === 0) {
-        tbody.innerHTML = '<tr style="border-bottom: 1px solid #ddd;"><td colspan="9" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
+        tbody.innerHTML = '<tr style="border-bottom: 1px solid #ddd;"><td colspan="8" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
+        console.log('テーブルが更新されました（データなし）');
         return;
       }
 
       tbody.innerHTML = log.map((entry, idx) => {
         const patient = master.find(p => p.patientId === entry.patientId);
-        const patientName = patient ? patient.lastNameKanji : '不明';
+        const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKana}` : '不明';
         const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
         const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
         const visitorName = entry.visitorSignature ? '署名あり' : '署名なし';
@@ -642,22 +651,74 @@
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitId}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${patientName}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.roomNo}号室</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${visitorName}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd; text-align: center;">
+              <button onclick="showSignature('${entry.visitId}')" style="padding: 4px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
+            </td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.relation}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitorCount}名</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.displayTime}</td>
             <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd; background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
-            <td style="padding: 8px; text-align: center;">
-              <button onclick="showSignature('${entry.visitId}')" style="padding: 4px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
-            </td>
+            <td style="padding: 8px; background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
           </tr>
         `;
       }).join('');
+
+      console.log('テーブルが更新されました（データあり）');
     }
 
     function applyAdminFilters() {
-      alert('検索・フィルター機能（未実装）');
+      const log = getVisitLog();
+      const master = fetchPatientMaster();
+      const tbody = document.getElementById('admin-table-body');
+
+      const floor = document.getElementById('admin-filter-floor').value;
+      const room = document.getElementById('admin-filter-room').value;
+      const date = document.getElementById('admin-filter-date').value;
+      const patient = document.getElementById('admin-filter-patient').value;
+
+      // フィルタリング
+      let filtered = log.filter(entry => {
+        // フロア検索：部屋番号の頭の数字
+        if (floor && entry.roomNo.charAt(0) !== floor) return false;
+        // 部屋番号検索
+        if (room && !entry.roomNo.includes(room)) return false;
+        // 日付検索
+        if (date && !entry.displayTime.includes(date)) return false;
+        // 患者名検索
+        if (patient) {
+          const p = master.find(m => m.patientId === entry.patientId);
+          if (!p || !p.lastNameKanji.includes(patient)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr style="border-bottom: 1px solid #ddd;"><td colspan="8" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((entry, idx) => {
+        const p = master.find(m => m.patientId === entry.patientId);
+        const patientName = p ? `${p.lastNameKanji}${p.firstNameKana}` : '不明';
+        const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
+        const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
+
+        return `
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitId}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${patientName}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.roomNo}号室</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd; text-align: center;">
+              <button onclick="showSignature('${entry.visitId}')" style="padding: 4px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
+            </td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.relation}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitorCount}名</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.displayTime}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
+            <td style="padding: 8px; background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
     function showSignature(visitId) {
