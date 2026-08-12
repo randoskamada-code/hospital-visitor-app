@@ -263,24 +263,24 @@
       </section>
       <section class="screen" id="screen-phone">
         <button class="back-button" onclick="goBack()">← 戻る</button>
-        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">お電話番号をご入力ください</div>
-        <div class="screen-content">
-          <div style="font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 20px;">次回から受付が早くなります</div>
-          <div class="input-display" id="phone-display">-</div>
-          <div class="help-text">携帯電話またはご自宅の電話番号を10桁または11桁でご入力ください</div>
-          <div class="numpad-container" id="numpad-phone"></div>
+        <div style="text-align: center; width: 100%; margin-bottom: 15px; font-size: var(--fs-sm); font-weight: 600;">お電話番号をご入力ください</div>
+        <div class="screen-content" style="flex: 1; justify-content: flex-start; padding-top: 0;">
+          <div style="font-size: var(--fs-xs); color: var(--color-text-sub); margin-bottom: 10px;">次回から受付が早くなります</div>
+          <div class="input-display" id="phone-display" style="font-size: var(--fs-lg); margin-bottom: 8px;">-</div>
+          <div class="help-text" style="margin-bottom: 10px;">10桁または11桁</div>
+          <div class="numpad-container" id="numpad-phone" style="margin-bottom: 10px;"></div>
           <button class="btn-large" id="phone-submit-btn" onclick="submitPhone()" disabled>つぎへ</button>
         </div>
         <button class="reset-button" onclick="goTop()">最初に戻る</button>
       </section>
       <section class="screen" id="screen-repeat-phone">
         <button class="back-button" onclick="goBack()">← 戻る</button>
-        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">お電話番号をご入力ください</div>
-        <div class="screen-content">
-          <div style="font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 20px;">前回ご登録いただいたお電話番号をご入力ください</div>
-          <div class="input-display" id="repeat-phone-display">-</div>
-          <div id="repeat-phone-message" class="message-box"></div>
-          <div class="numpad-container" id="numpad-repeat-phone"></div>
+        <div style="text-align: center; width: 100%; margin-bottom: 15px; font-size: var(--fs-sm); font-weight: 600;">お電話番号をご入力ください</div>
+        <div class="screen-content" style="flex: 1; justify-content: flex-start; padding-top: 0;">
+          <div style="font-size: var(--fs-xs); color: var(--color-text-sub); margin-bottom: 10px;">前回登録のお電話番号</div>
+          <div class="input-display" id="repeat-phone-display" style="font-size: var(--fs-lg); margin-bottom: 8px;">-</div>
+          <div id="repeat-phone-message" class="message-box" style="margin: 8px 0; min-height: 0;"></div>
+          <div class="numpad-container" id="numpad-repeat-phone" style="margin-bottom: 10px;"></div>
           <button class="btn-large" id="repeat-phone-submit-btn" onclick="submitRepeatPhone()" disabled>つぎへ</button>
         </div>
         <button class="reset-button" onclick="goTop()">最初に戻る</button>
@@ -323,6 +323,66 @@
             <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="goTop()">終了して最初に戻る</button>
           </div>
           <div class="timer-text">(20秒後に自動で最初の画面に戻ります)</div>
+        </div>
+      </section>
+
+      <!-- 管理画面：ログイン -->
+      <section class="screen" id="screen-admin-login">
+        <button class="back-button" onclick="goTop()">← 戻る</button>
+        <div class="screen-content">
+          <div style="font-size: var(--fs-lg); margin-bottom: 30px; font-weight: 600;">管理画面ログイン</div>
+          <div style="width: 80%; max-width: 400px;">
+            <input type="password" id="admin-password" placeholder="パスワードを入力" style="width: 100%; padding: 16px; font-size: var(--fs-md); border: var(--border-w) solid var(--color-border); border-radius: var(--radius); font-family: inherit; margin-bottom: 20px;">
+            <button class="btn-large" onclick="verifyAdminPassword()" style="width: 100%;">ログイン</button>
+          </div>
+          <div id="admin-error-msg" style="color: var(--color-alert); font-size: var(--fs-xs); margin-top: 15px; text-align: center;"></div>
+        </div>
+      </section>
+
+      <!-- 管理画面：ダッシュボード -->
+      <section class="screen" id="screen-admin-dashboard">
+        <button class="back-button" onclick="goTop()">← 戻る</button>
+        <div style="width: 100%; padding: 20px; overflow-y: auto;">
+          <div style="text-align: center; margin-bottom: 20px; font-size: var(--fs-md); font-weight: 600;">訪問者管理ダッシュボード</div>
+
+          <!-- 検索・フィルター -->
+          <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center;">
+            <select id="admin-filter-floor" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px;">
+              <option value="">全フロア</option>
+              <option value="2">2階</option>
+              <option value="3">3階</option>
+              <option value="4">4階</option>
+              <option value="5">5階</option>
+            </select>
+            <input type="date" id="admin-filter-date" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px;">
+            <input type="text" id="admin-filter-patient" placeholder="患者氏名" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px; width: 120px;">
+            <input type="text" id="admin-filter-visitor" placeholder="面会者氏名" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px; width: 120px;">
+            <button onclick="applyAdminFilters()" style="padding: 8px 16px; font-size: var(--fs-xs); background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">検索</button>
+          </div>
+
+          <!-- 訪問記録テーブル -->
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: var(--fs-xs); background-color: white;">
+              <thead>
+                <tr style="background-color: var(--color-primary-light); border-bottom: 2px solid var(--color-border);">
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">受付番号</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">患者氏名</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">患者部屋</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">面会者</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">関係</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">人数</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">入館時間</th>
+                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">退館時間</th>
+                  <th style="padding: 10px; text-align: left;">状態</th>
+                </tr>
+              </thead>
+              <tbody id="admin-table-body">
+                <tr style="border-bottom: 1px solid #ddd;">
+                  <td colspan="9" style="padding: 15px; text-align: center; color: #999;">データなし</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>
@@ -436,6 +496,20 @@
           // 戻ってきた場合は roomNo を保持、新規の場合のみクリア
           if (!AppState.roomNo) AppState.inputBuffer = '';
           else AppState.inputBuffer = AppState.roomNo;
+        } else if (screenId === 'screen-kana') {
+          // 戻ってきた場合は kanaBuffer を保持、新規の場合のみクリア
+          if (!AppState.kanaBuffer) {
+            AppState.kanaBuffer = '';
+          }
+          document.getElementById('search-message').textContent = '';
+        } else if (screenId === 'screen-phone' || screenId === 'screen-repeat-phone') {
+          // 新規に電話番号入力画面に入ったら inputBuffer をクリア
+          if (AppState.phoneNumber) {
+            // 戻ってきた場合は電話番号を保持
+            AppState.inputBuffer = AppState.phoneNumber;
+          } else {
+            AppState.inputBuffer = '';
+          }
         } else if (screenId === 'screen-count' && AppState.visitorCount) {
           document.querySelectorAll('.count-btn').forEach(btn => {
             if (btn.textContent.includes(AppState.visitorCount + '名')) {
@@ -499,7 +573,59 @@
     function startNewFlow() { AppState.mode = 'new'; AppState.entryType = 'new'; showScreen('screen-room'); }
     function startRepeatFlow() { AppState.mode = 'repeat'; AppState.entryType = 'repeat'; showScreen('screen-repeat-phone'); }
     function startCheckoutFlow() { alert('退館手続き画面（未実装）'); }
-    function openAdminLogin() { alert('管理画面ログイン（未実装）'); }
+
+    function openAdminLogin() {
+      document.getElementById('admin-password').value = '';
+      document.getElementById('admin-error-msg').textContent = '';
+      showScreen('screen-admin-login');
+    }
+
+    function verifyAdminPassword() {
+      const password = document.getElementById('admin-password').value;
+      const correctPassword = '1234'; // 仮のパスワード
+      if (password === correctPassword) {
+        loadAdminDashboard();
+        showScreen('screen-admin-dashboard');
+      } else {
+        document.getElementById('admin-error-msg').textContent = 'パスワードが正しくありません';
+      }
+    }
+
+    function loadAdminDashboard() {
+      const log = getVisitLog();
+      const master = fetchPatientMaster();
+      const tbody = document.getElementById('admin-table-body');
+
+      if (log.length === 0) {
+        tbody.innerHTML = '<tr style="border-bottom: 1px solid #ddd;"><td colspan="9" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = log.map((entry, idx) => {
+        const patient = master.find(p => p.patientId === entry.patientId);
+        const patientName = patient ? patient.lastNameKanji : '不明';
+        const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
+        const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
+
+        return `
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitId}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${patientName}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.roomNo}号室</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">-</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.relation}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitorCount}名</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.displayTime}</td>
+            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
+            <td style="padding: 8px; background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function applyAdminFilters() {
+      alert('検索・フィルター機能（未実装）');
+    }
 
     function pressKey(char) {
       const cur = AppState.currentScreen;
