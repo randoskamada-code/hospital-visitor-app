@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>病院面会受付システム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js"></script>
   <style>
     :root {
       --color-bg: #FFFFFF;
@@ -105,11 +106,20 @@
     </header>
     <main id="screen-container">
       <section class="screen is-active" id="screen-top">
-        <div class="screen-content">
-          <h1 style="font-size: var(--fs-md); margin-bottom: 20px;">面会の方法をお選びください</h1>
-          <button class="btn-jumbo" onclick="startNewFlow()"><div style="text-align: center;"><div style="font-size: var(--fs-md); margin-bottom: 10px;">初めて（または久しぶり）の面会</div><div style="font-size: var(--fs-xs); color: var(--color-text-sub);">お部屋番号とお名前からご登録します</div></div></button>
-          <button class="btn-jumbo" onclick="startRepeatFlow()"><div style="text-align: center;"><div style="font-size: var(--fs-md); margin-bottom: 10px;">2回目以降の面会</div><div style="font-size: var(--fs-xs); color: var(--color-text-sub);">お電話番号ですぐに受付できます</div></div></button>
-          <div style="text-align: center; margin-top: 50px; font-size: var(--fs-xs); color: var(--color-text-sub);">お困りの際は1階受付窓口へお声がけください</div>
+        <button class="back-button" onclick="openAdminLogin()" style="left: auto; right: 20px; color: #999; border-color: #ccc; font-size: 12px; padding: 8px 12px;">🔐 管理</button>
+        <div style="display: flex; width: 100%; height: 100%; flex-direction: column;">
+          <!-- 上半分：面会フロー -->
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-bottom: 3px solid var(--color-border); padding: 20px;">
+            <h1 style="font-size: var(--fs-md); margin-bottom: 20px;">面会</h1>
+            <button class="btn-jumbo" onclick="startNewFlow()" style="margin: 10px 0;"><div style="text-align: center;"><div style="font-size: var(--fs-sm); margin-bottom: 10px;">初めて（または久しぶり）</div><div style="font-size: var(--fs-xs); color: var(--color-text-sub);">新規登録</div></div></button>
+            <button class="btn-jumbo" onclick="startRepeatFlow()" style="margin: 10px 0;"><div style="text-align: center;"><div style="font-size: var(--fs-sm); margin-bottom: 10px;">2回目以降</div><div style="font-size: var(--fs-xs); color: var(--color-text-sub);">電話番号で受付</div></div></button>
+          </div>
+
+          <!-- 下半分：退館フロー -->
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
+            <h1 style="font-size: var(--fs-md); margin-bottom: 20px;">退館</h1>
+            <button class="btn-jumbo" onclick="startCheckoutFlow()" style="background-color: #FF9800; border-color: #FF9800;"><div style="text-align: center;"><div style="font-size: var(--fs-sm); margin-bottom: 10px;">退館手続き</div><div style="font-size: var(--fs-xs); color: white;">QRコード読み込み</div></div></button>
+          </div>
         </div>
       </section>
       <section class="screen" id="screen-room">
@@ -302,6 +312,7 @@
             <div style="margin: 10px 0; font-size: var(--fs-sm);">人数： <span id="pass-count"></span></div>
             <div style="border-top: 1px solid var(--color-border); padding-top: 10px; margin-top: 10px;">
               <div id="pass-time" style="text-align: center; font-size: var(--fs-xs); margin: 10px 0;"></div>
+              <div id="pass-qr" style="text-align: center; margin: 10px 0; display: flex; justify-content: center;"></div>
               <div class="pass-id" id="pass-id"></div>
             </div>
           </div>
@@ -420,7 +431,9 @@
         } else if (screenId === 'screen-top') {
           resetAppState();
         } else if (screenId === 'screen-room') {
-          AppState.inputBuffer = '';
+          // 戻ってきた場合は roomNo を保持、新規の場合のみクリア
+          if (!AppState.roomNo) AppState.inputBuffer = '';
+          else AppState.inputBuffer = AppState.roomNo;
         } else if (screenId === 'screen-count' && AppState.visitorCount) {
           document.querySelectorAll('.count-btn').forEach(btn => {
             if (btn.textContent.includes(AppState.visitorCount + '名')) {
@@ -458,6 +471,8 @@
     function goBack() {
       if (AppState.currentScreen === 'screen-count') {
         showScreen(AppState.mode === 'repeat' ? 'screen-repeat-confirm' : 'screen-relation');
+      } else if (AppState.currentScreen === 'screen-complete') {
+        showScreen(AppState.mode === 'repeat' ? 'screen-repeat-confirm' : 'screen-phone');
       } else {
         const map = {
           'screen-room': 'screen-top',
@@ -468,7 +483,8 @@
           'screen-relation': 'screen-sign',
           'screen-phone': 'screen-count',
           'screen-repeat-phone': 'screen-top',
-          'screen-repeat-confirm': 'screen-repeat-phone'
+          'screen-repeat-confirm': 'screen-repeat-phone',
+          'screen-blocked': 'screen-top'
         };
         const prev = map[AppState.currentScreen];
         if (prev) {
@@ -480,6 +496,8 @@
 
     function startNewFlow() { AppState.mode = 'new'; AppState.entryType = 'new'; showScreen('screen-room'); }
     function startRepeatFlow() { AppState.mode = 'repeat'; AppState.entryType = 'repeat'; showScreen('screen-repeat-phone'); }
+    function startCheckoutFlow() { alert('退館手続き画面（未実装）'); }
+    function openAdminLogin() { alert('管理画面ログイン（未実装）'); }
 
     function pressKey(char) {
       const cur = AppState.currentScreen;
@@ -535,12 +553,7 @@
       if (AppState.currentScreen === 'screen-room') {
         document.getElementById('room-display').textContent = AppState.inputBuffer || '-';
         document.getElementById('room-submit-btn').disabled = AppState.inputBuffer.length !== 3;
-        if (AppState.inputBuffer.length === 3) {
-          if (autoSubmitTimerId) clearTimeout(autoSubmitTimerId);
-          autoSubmitTimerId = setTimeout(() => submitRoom(), 300);
-        } else {
-          if (autoSubmitTimerId) clearTimeout(autoSubmitTimerId);
-        }
+        // 自動進行を停止 - ボタンクリック時のみ進行
       } else if (AppState.currentScreen === 'screen-kana') {
         document.getElementById('kana-display').textContent = AppState.kanaBuffer || '-';
         document.getElementById('kana-submit-btn').disabled = !AppState.kanaBuffer;
@@ -616,6 +629,8 @@
       const now = new Date();
       const today = now.toISOString().split('T')[0].replace(/-/g, '');
       const time = now.toTimeString().split(' ')[0].replace(/:/g, '');
+      const ms = now.getMilliseconds().toString().padStart(3, '0');
+      const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
       let seqData = { date: today, seq: 0 };
       try {
         const stored = localStorage.getItem('vms_daily_seq');
@@ -631,7 +646,8 @@
       } catch (e) {
         seqData.seq = 1;
       }
-      return `V${today}_${time}_${String(seqData.seq).padStart(3, '0')}`;
+      // 日付_時刻ミリ秒_シーケンス_ランダム文字列
+      return `V${today}_${time}${ms}_${String(seqData.seq).padStart(3, '0')}_${rand}`;
     }
 
     function searchPatientsByLastName(roomNo, kana) {
@@ -965,13 +981,27 @@
     function submitNewVisit() {
       saveVisitLog();
       const now = new Date();
+      const visitId = generateVisitId();
       document.getElementById('pass-room').textContent = `${AppState.selectedPatient.roomNo} 号室`;
       document.getElementById('pass-name').textContent = `${AppState.selectedPatient.lastNameKanji}　様`;
       if (AppState.signatureData) document.getElementById('pass-sign').innerHTML = `<img src="${AppState.signatureData}">`;
       document.getElementById('pass-relation').textContent = AppState.relation;
       document.getElementById('pass-count').textContent = `${AppState.visitorCount}名`;
       document.getElementById('pass-time').textContent = formatTimestamp(now);
-      document.getElementById('pass-id').textContent = `受付番号 ${generateVisitId()}`;
+      document.getElementById('pass-id').textContent = `受付番号 ${visitId}`;
+
+      // QRコード生成
+      const qrContainer = document.getElementById('pass-qr');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, {
+        text: visitId,
+        width: 150,
+        height: 150,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
       showScreen('screen-complete');
     }
 
