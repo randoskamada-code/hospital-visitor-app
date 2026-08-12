@@ -17,7 +17,7 @@
       --color-disabled-bg: #E0E0E0;
       --color-disabled-text: #9E9E9E;
       --fs-display: 96px;
-      --fs-huge: 72px;
+      --fs-huge: 56px;
       --fs-xl: 56px;
       --fs-lg: 44px;
       --fs-md: 34px;
@@ -25,8 +25,8 @@
       --fs-xs: 20px;
       --btn-h-jumbo: 200px;
       --btn-h-large: 100px;
-      --key-size: 110px;
-      --kana-size: 70px;
+      --key-size: 95px;
+      --kana-size: 60px;
       --radius: 16px;
       --border-w: 4px;
       --gap: 20px;
@@ -670,10 +670,15 @@
     }
 
     function submitRoom() {
+      if (AppState.inputBuffer.length !== 3) {
+        alert('部屋番号は3ケタでご入力ください');
+        return;
+      }
       AppState.roomNo = AppState.inputBuffer;
       AppState.inputBuffer = '';
       document.getElementById('kana-room-display').textContent = `${AppState.roomNo}号室`;
       showScreen('screen-kana');
+    }
     }
 
     function submitKana() {
