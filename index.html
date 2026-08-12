@@ -542,6 +542,15 @@
       hasSignature = false;
       if (signatureCanvas) clearSignature();
       document.getElementById('relation-selected').textContent = '';
+      // 完了画面の表示をリセット
+      document.getElementById('pass-room').textContent = '';
+      document.getElementById('pass-name').textContent = '';
+      document.getElementById('pass-sign').innerHTML = '';
+      document.getElementById('pass-relation').textContent = '';
+      document.getElementById('pass-count').textContent = '';
+      document.getElementById('pass-time').textContent = '';
+      document.getElementById('pass-id').textContent = '';
+      document.getElementById('pass-qr').innerHTML = '';
     }
 
     function goTop() { resetAppState(); showScreen('screen-top'); }
@@ -1131,23 +1140,31 @@
       document.getElementById('pass-time').textContent = formatTimestamp(now);
       document.getElementById('pass-id').textContent = `受付番号 ${visitId}`;
 
-      // QRコード生成
+      // QRコード生成（ライブラリが存在する場合のみ）
       const qrContainer = document.getElementById('pass-qr');
       qrContainer.innerHTML = '';
-      new QRCode(qrContainer, {
-        text: visitId,
-        width: 150,
-        height: 150,
-        colorDark: "#000000",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H
-      });
+      if (typeof QRCode !== 'undefined') {
+        try {
+          new QRCode(qrContainer, {
+            text: visitId,
+            width: 150,
+            height: 150,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+          });
+        } catch (e) {
+          qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px;">QRコード生成エラー</div>`;
+        }
+      } else {
+        qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px;">訪問ID: ${visitId}</div>`;
+      }
 
       showScreen('screen-complete');
     }
 
     function submitRepeatVisit() {
-      saveVisitLog();
+      // saveVisitLog() は printLabel() で呼び出す
       submitNewVisit();
     }
 
