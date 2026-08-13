@@ -3588,26 +3588,38 @@ var qrcode = function() {
       // 【数字のみにする理由】退館画面の手入力フォールバックは、他の画面と同じ
       // テンキー（ソフトキーボードを出さない自前の数字ボタン）で入力させたい。
       // "V"や"-"のような記号が混じると数字専用テンキーで入力できなくなるため、
-      // 「YYMMDD + 当日の連番3桁」の合計9桁の数字のみで構成する。
-      // 一意性は vms_daily_seq が日付ごとに連番管理しているため、これで十分。
+      // 「YYMMDD + 下3桁」の合計9桁の数字のみで構成する。
+      //
+      // 【下3桁を連番にしない理由】以前は当日の来客に 001, 002, 003... と連番を
+      // 振っていたが、これだと手入力（QR読み取り不可時の代替）で1桁打ち間違えるだけで
+      // 隣の来客の番号（＝別の実在する来客の受付番号）と一致してしまい、誤って
+      // 別の面会者を退館させてしまう恐れがあった。下3桁をランダムにすることで、
+      // 1桁の打ち間違いが別の実在番号とたまたま一致する可能性を大きく下げる
+      // （なお、退館時は手入力の場合のみ氏名・部屋番号を表示して確認を求めるため、
+      // 万一一致してしまっても人の目で気付けるようにしている＝commitCheckout 付近参照）。
       const now = new Date();
       const y = String(now.getFullYear()).slice(2);
       const m = String(now.getMonth() + 1).padStart(2, '0');
       const d = String(now.getDate()).padStart(2, '0');
       const today = `${y}${m}${d}`;
-      let seq = 1;
-      try {
-        const stored = localStorage.getItem('vms_daily_seq');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          seq = (parsed.date === today ? parsed.seq : 0) + 1;
-        }
-        localStorage.setItem('vms_daily_seq', JSON.stringify({ date: today, seq: seq }));
-      } catch (e) {
-        seq = 1;
-      }
-      // 例：260813004（9桁の数字のみ）
-      return `${today}${String(seq).padStart(3, '0')}`;
+
+      // 当日すでに発行済みの受付番号（面会ログ）と重複しないようにする
+      const log = getVisitLog();
+      const usedToday = new Set(
+        log.filter(e => e.visitId && e.visitId.startsWith(today)).map(e => e.visitId)
+      );
+
+      let visitId;
+      let attempts = 0;
+      do {
+        const suffix = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+        visitId = `${today}${suffix}`;
+        attempts++;
+        // 1000通り中、当日の来客数が極端に多い等でどうしても衝突が続く場合の保険（実運用ではまず起こらない）
+      } while (usedToday.has(visitId) && attempts < 50);
+
+      // 例：260813427（9桁の数字のみ、下3桁はランダム）
+      return visitId;
     }
 
     function searchPatientsByLastName(roomNo, kana) {
@@ -4051,7 +4063,10 @@ var qrcode = function() {
     }
 
     function submitCheckout() {
-      // QRスキャナー（またはEnterキー）からの送信
+      // QRスキャナー（またはEnterキー）からの送信。
+      // 【確認画面を挟まない理由】QRスキャンは面会者本人が持っている物理的な面会証を
+      // 読み取る行為であり、手入力のような1桁の打ち間違いは起こりにくいため、
+      // 従来通り確認画面を挟まず即座に処理する（スキャンして終わり、が前提のUX）。
       const input = document.getElementById('checkout-input');
       const visitId = input.value.trim();
       // 【重要】読み取り後は必ず空にする。以前はここでクリアしておらず、
@@ -4059,22 +4074,25 @@ var qrcode = function() {
       // 前回分の文字列の後ろに新しい読み取り結果が連結されてしまい、
       // 何度スキャンしても「受付番号が見つかりません」になる不具合があった。
       input.value = '';
-      processCheckoutId(visitId);
+      if (!visitId) return;
+      commitCheckout(visitId);
     }
 
     function submitCheckoutManual() {
-      // 手入力フォールバック（テンキー）からの送信
-      processCheckoutId(AppState.inputBuffer);
+      // 手入力フォールバック（テンキー）からの送信。
+      // 【誤操作防止】受付番号の下3桁は同日の他の来客と近い数字になり得るため、
+      // 1桁の打ち間違いだけで別の実在する来客の番号と一致し、誤ってその方を
+      // 退館させてしまう恐れがある。そのため手入力の場合は即座に処理せず、
+      // まず氏名・部屋番号を表示して人の目で確認してもらってから実行する。
+      requestCheckoutConfirmation(AppState.inputBuffer);
     }
 
-    function processCheckoutId(visitId) {
+    function requestCheckoutConfirmation(visitId) {
       const log = getVisitLog();
       const entry = log.find(e => e.visitId === visitId);
       const resultDiv = document.getElementById('checkout-result');
 
-      if (!visitId) {
-        return;
-      }
+      if (!visitId) return;
 
       if (!entry) {
         resultDiv.innerHTML = `<div style="color: var(--color-alert); font-size: var(--fs-md); font-weight: 600; margin: 20px 0;">受付番号が見つかりません</div>`;
@@ -4082,6 +4100,46 @@ var qrcode = function() {
       }
 
       if (entry.checkoutTime) {
+        resultDiv.innerHTML = `<div style="color: var(--color-alert); font-size: var(--fs-md); font-weight: 600; margin: 20px 0;">既に退館手続きが済んでいます</div>`;
+        return;
+      }
+
+      const master = fetchPatientMaster();
+      const patient = master.find(p => p.patientId === entry.patientId);
+      const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji}` : '不明';
+
+      // スクロールなしで確認内容が見えるよう、スキャン枠・手入力欄は非表示にする
+      document.getElementById('checkout-scan-view').style.display = 'none';
+      document.getElementById('checkout-manual-view').style.display = 'none';
+
+      resultDiv.innerHTML = `
+        <div style="background-color: #FFF8E1; padding: 20px; border-radius: var(--radius); margin: 20px 0; border: 2px solid #F5A623;">
+          <div style="font-size: var(--fs-sm); margin-bottom: 10px; font-weight: 600;">この方の退館手続きを行います</div>
+          <div style="font-size: var(--fs-md); margin: 10px 0; font-weight: 700;">${patientName} 様</div>
+          <div style="font-size: var(--fs-sm); margin: 10px 0;">お部屋: ${entry.roomNo}号室</div>
+          <div style="font-size: var(--fs-md); margin-top: 15px; font-weight: 600;">お名前・お部屋番号に間違いありませんか？</div>
+        </div>
+        <div style="display: flex; gap: var(--gap); justify-content: center; flex-wrap: wrap;">
+          <button class="btn-large" style="background-color: white; color: var(--color-primary);" onclick="showCheckoutManualEntry()">いいえ、番号を確認する</button>
+          <button class="btn-large" style="background-color: var(--color-primary); color: white;" onclick="commitCheckout('${entry.visitId}')">はい、退館する</button>
+        </div>
+      `;
+    }
+
+    function commitCheckout(visitId) {
+      // 実際に退館時刻を記録して保存し、完了パネルを表示する共通処理。
+      // QRスキャン（即時）と手入力（確認後）の両方から呼ばれる。
+      const log = getVisitLog();
+      const entry = log.find(e => e.visitId === visitId);
+      const resultDiv = document.getElementById('checkout-result');
+
+      if (!entry) {
+        resultDiv.innerHTML = `<div style="color: var(--color-alert); font-size: var(--fs-md); font-weight: 600; margin: 20px 0;">受付番号が見つかりません</div>`;
+        return;
+      }
+
+      if (entry.checkoutTime) {
+        // 確認画面を表示している間に、別の端末等で既に退館処理された場合の保険
         resultDiv.innerHTML = `<div style="color: var(--color-alert); font-size: var(--fs-md); font-weight: 600; margin: 20px 0;">既に退館手続きが済んでいます</div>`;
         return;
       }
@@ -4103,7 +4161,7 @@ var qrcode = function() {
         return;
       }
 
-      // 確認画面を表示
+      // 完了パネルを表示
       const master = fetchPatientMaster();
       const patient = master.find(p => p.patientId === entry.patientId);
       const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji}` : '不明';
@@ -4133,7 +4191,7 @@ var qrcode = function() {
       // 「確認」ボタン等のクリックイベントはこの後 document までバブリングし、
       // 全画面共通の resetIdleTimer()（180秒/90秒/30秒に設定し直す処理）が実行される。
       // ここで同期的に startCheckoutResultTimer() を呼ぶと、直後のバブリングで
-      // すぐ上書きされて 15秒 ではなく 30秒 タイマーになってしまう。
+      // すぐ上書きされて 8秒 ではなく 15秒 タイマーになってしまう。
       AppState.checkoutSucceeded = true;
       setTimeout(() => { startCheckoutResultTimer(); }, 0);
     }
