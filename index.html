@@ -521,6 +521,7 @@
                   <th class="col-nowrap">面会者署名</th>
                   <th class="col-nowrap">関係</th>
                   <th class="col-nowrap">人数</th>
+                  <th class="col-nowrap">面会日</th>
                   <th class="col-nowrap">入館時間</th>
                   <th class="col-nowrap">退館時間</th>
                   <th class="col-nowrap">状態</th>
@@ -528,7 +529,7 @@
               </thead>
               <tbody id="admin-table-body">
                 <tr style="border-bottom: 1px solid #ddd;">
-                  <td colspan="9" style="padding: 15px; text-align: center; color: #999;">データなし</td>
+                  <td colspan="10" style="padding: 15px; text-align: center; color: #999;">データなし</td>
                 </tr>
               </tbody>
             </table>
@@ -2942,7 +2943,8 @@ var qrcode = function() {
       phoneNumber: '',
       entryType: null,
       lastVisitRecord: null,
-      idleTimerId: null
+      idleTimerId: null,
+      checkoutSucceeded: false
     };
 
     let hasSignature = false;
@@ -2966,6 +2968,7 @@ var qrcode = function() {
         } else if (screenId === 'screen-checkout') {
           // チェックアウト画面：QRスキャン優先ビューに戻し、スキャナー入力用の隠しinputへフォーカス
           AppState.inputBuffer = '';
+          AppState.checkoutSucceeded = false;
           document.getElementById('checkout-result').innerHTML = '';
           document.getElementById('checkout-input').value = '';
           showCheckoutScanView();
@@ -3015,6 +3018,7 @@ var qrcode = function() {
       AppState.phoneNumber = '';
       AppState.entryType = null;
       AppState.lastVisitRecord = null;
+      AppState.checkoutSucceeded = false;
       hasSignature = false;
       if (signatureCanvas) clearSignature();
       document.getElementById('relation-selected').textContent = '';
@@ -3140,10 +3144,41 @@ var qrcode = function() {
       return '不明';
     }
 
+    // formatTimestamp() が作る "2026年08月13日(木) 07時17分" のような表示用文字列を、
+    // 「2026年08月13日(木)」（日付部分）と「07時17分」（時刻部分）に分割する。
+    // 管理画面テーブルの「面会日」「入館時間」「退館時間」の列を別々にするために使う。
+    function splitDisplayDateTime(displayTimeStr) {
+      if (!displayTimeStr) return { date: '', time: '' };
+      const spaceIdx = displayTimeStr.indexOf(' ');
+      if (spaceIdx === -1) return { date: displayTimeStr, time: '' };
+      return { date: displayTimeStr.slice(0, spaceIdx), time: displayTimeStr.slice(spaceIdx + 1) };
+    }
+
+    // 「2026年08月13日(木)」形式の日付表示文字列を、<input type="date"> の値と同じ
+    // "2026-08-13" 形式に変換する（検索フィルターでの比較に使う）。
+    function toIsoDate(displayDateStr) {
+      const m = displayDateStr && displayDateStr.match(/(\d{4})年(\d{2})月(\d{2})日/);
+      return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+    }
+
     function buildAdminRow(entry, master) {
       const patientName = resolvePatientDisplayName(entry, master);
       const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
       const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
+
+      // 【入館時間の列が「西暦の日付＋時刻」を1列に詰め込んでいた問題の修正】
+      // 以前は「2026年08月13日(木) 07時17分」のように日付と時刻が1つの列に混在しており、
+      // 見た目が長くなるだけでなく、検索フィルターの「日付」欄（YYYY-MM-DD形式）と
+      // 文字列として一致しようがなく、検索してもヒットしない不具合の原因にもなっていた。
+      // 「面会日」列を分離し、「入館時間」「退館時間」は時刻のみを表示するようにする。
+      const checkin = splitDisplayDateTime(entry.displayTime);
+      const checkoutParts = entry.checkoutTime ? splitDisplayDateTime(entry.checkoutTime) : null;
+      // 退館が翌日以降にまたがった場合（宿泊対応など）は時刻だけだと誤解を招くため、日付が
+      // 入館日と異なるときだけ日付も一緒に表示する。同日中の退館がほとんどのはずなので、
+      // 通常は時刻のみのシンプルな表示になる。
+      const checkoutDisplay = !checkoutParts
+        ? '-'
+        : (checkoutParts.date === checkin.date ? checkoutParts.time : `${checkoutParts.date} ${checkoutParts.time}`);
 
       return `
         <tr>
@@ -3155,8 +3190,9 @@ var qrcode = function() {
           </td>
           <td class="col-nowrap">${entry.relation}</td>
           <td class="col-nowrap">${entry.visitorCount}名</td>
-          <td class="col-nowrap">${entry.displayTime}</td>
-          <td class="col-nowrap">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
+          <td class="col-nowrap">${checkin.date}</td>
+          <td class="col-nowrap">${checkin.time}</td>
+          <td class="col-nowrap">${checkoutDisplay}</td>
           <td class="col-nowrap" style="background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
         </tr>
       `;
@@ -3187,6 +3223,7 @@ var qrcode = function() {
       { key: null, label: '面会者署名' },
       { key: null, label: '関係' },
       { key: 'visitorCount', label: '人数' },
+      { key: 'checkin', label: '面会日' },
       { key: 'checkin', label: '入館時間' },
       { key: 'checkout', label: '退館時間' },
       { key: 'status', label: '状態' }
@@ -3258,8 +3295,15 @@ var qrcode = function() {
         if (floor && entry.roomNo.charAt(0) !== floor) return false;
         // 部屋番号検索
         if (room && !entry.roomNo.includes(room)) return false;
-        // 日付検索
-        if (date && !entry.displayTime.includes(date)) return false;
+        // 面会日検索
+        // 【不具合修正】以前は entry.displayTime（"2026年08月13日(木) 07時17分"）に対して
+        // <input type="date"> の値（"2026-08-13"）をそのまま includes() で探していたため、
+        // 表記が「年月日」と「-」区切りで一致せず、日付を指定してもヒットしなかった。
+        // 表示用の日付部分だけを取り出して同じ "YYYY-MM-DD" 形式に変換してから比較する。
+        if (date) {
+          const entryIsoDate = toIsoDate(splitDisplayDateTime(entry.displayTime).date);
+          if (entryIsoDate !== date) return false;
+        }
         // 患者名検索（新旧形式に対応）
         if (patient) {
           const searchName = resolvePatientDisplayName(entry, master);
@@ -3286,14 +3330,14 @@ var qrcode = function() {
       if (headRow) headRow.innerHTML = buildAdminHeaderRow();
 
       if (log.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
         return;
       }
 
       const filtered = sortAdminEntries(getFilteredAdminEntries(log, master), master);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
         return;
       }
 
@@ -3772,7 +3816,15 @@ var qrcode = function() {
     function startIdleTimer() {
       if (AppState.idleTimerId) clearTimeout(AppState.idleTimerId);
       if (AppState.currentScreen === 'screen-top') return;
-      const timeout = AppState.currentScreen === 'screen-complete' ? 90000 : 180000;
+      let timeout = 180000;
+      if (AppState.currentScreen === 'screen-complete') {
+        timeout = 90000;
+      } else if (AppState.currentScreen === 'screen-checkout' && AppState.checkoutSucceeded) {
+        // 【重要】退館手続き完了直後は、次の面会者の患者氏名・部屋番号・入退館時刻が
+        // 画面に表示され続ける。画面のどこかをタップするたびに呼ばれる resetIdleTimer()が
+        // ここを通っても通常の180秒（3分）まで延びてしまわないよう、短めの時間に留める。
+        timeout = 15000;
+      }
       AppState.idleTimerId = setTimeout(() => { goTop(); }, timeout);
     }
 
@@ -3784,6 +3836,15 @@ var qrcode = function() {
     function startCompleteTimer() {
       if (AppState.idleTimerId) clearTimeout(AppState.idleTimerId);
       AppState.idleTimerId = setTimeout(() => { goTop(); }, 20000);
+    }
+    function startCheckoutResultTimer() {
+      // 退館手続き完了直後、前の面会者の個人情報（氏名・部屋番号等）が画面に出続けるのを防ぐため、
+      // ボタンが押されなくても短時間で自動的に最初の画面へ戻す。
+      // 【8秒にした理由】この画面はすぐ次の退館・受付にも使われる想定のため、
+      // 完了内容を一目確認できれば十分な最短の時間として8秒とした
+      // （もちろん「最初に戻る」ボタンを押せばいつでもすぐに戻れる）。
+      if (AppState.idleTimerId) clearTimeout(AppState.idleTimerId);
+      AppState.idleTimerId = setTimeout(() => { goTop(); }, 8000);
     }
 
     function submitRoom() {
@@ -3991,7 +4052,13 @@ var qrcode = function() {
 
     function submitCheckout() {
       // QRスキャナー（またはEnterキー）からの送信
-      const visitId = document.getElementById('checkout-input').value.trim();
+      const input = document.getElementById('checkout-input');
+      const visitId = input.value.trim();
+      // 【重要】読み取り後は必ず空にする。以前はここでクリアしておらず、
+      // 一度読み取りに失敗（該当なし等）した後にもう一度スキャンすると、
+      // 前回分の文字列の後ろに新しい読み取り結果が連結されてしまい、
+      // 何度スキャンしても「受付番号が見つかりません」になる不具合があった。
+      input.value = '';
       processCheckoutId(visitId);
     }
 
@@ -4041,16 +4108,34 @@ var qrcode = function() {
       const patient = master.find(p => p.patientId === entry.patientId);
       const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji}` : '不明';
 
+      // 【表示崩れの修正】以前はQRスキャン待ち受け表示（大きなアイコン枠）を残したまま
+      // その下に完了メッセージを追加していたため、画面に収まりきらず「退館手続き完了」を
+      // 見るのに下へスクロールする必要があった。スキャン枠・手入力欄は非表示にして
+      // 完了メッセージだけを画面中央に大きく表示する。
+      document.getElementById('checkout-scan-view').style.display = 'none';
+      document.getElementById('checkout-manual-view').style.display = 'none';
+
       resultDiv.innerHTML = `
         <div style="background-color: var(--color-primary-light); padding: 20px; border-radius: var(--radius); margin: 20px 0; border: 2px solid var(--color-primary);">
-          <div style="font-size: var(--fs-md); margin-bottom: 10px; font-weight: 600;">退館手続き完了</div>
+          <div style="font-size: var(--fs-md); margin-bottom: 10px; font-weight: 700;">退館手続き完了</div>
           <div style="font-size: var(--fs-sm); margin: 10px 0;">患者様: ${patientName}</div>
           <div style="font-size: var(--fs-sm); margin: 10px 0;">お部屋: ${entry.roomNo}号室</div>
           <div style="font-size: var(--fs-sm); margin: 10px 0; color: var(--color-text-sub);">入館時刻: ${entry.displayTime}</div>
           <div style="font-size: var(--fs-sm); margin: 10px 0; color: var(--color-text-sub);">退館時刻: ${entry.checkoutTime}</div>
         </div>
-        <button class="btn-large" onclick="goTop()" style="margin-top: 20px;">最初に戻る</button>
+        <button class="btn-large" onclick="goTop()" style="margin-top: 10px;">最初に戻る</button>
+        <div class="timer-text">(8秒後に自動で最初の画面に戻ります)</div>
       `;
+
+      // ボタンを押さなくても、次の面会者や通りがかりの人に前の来院者の氏名・部屋番号が
+      // 見え続けないよう、短時間で自動的に最初の画面へ戻す。
+      // 【重要】setTimeout(...,0) で1テック遅らせて呼び出すこと。
+      // 「確認」ボタン等のクリックイベントはこの後 document までバブリングし、
+      // 全画面共通の resetIdleTimer()（180秒/90秒/30秒に設定し直す処理）が実行される。
+      // ここで同期的に startCheckoutResultTimer() を呼ぶと、直後のバブリングで
+      // すぐ上書きされて 15秒 ではなく 30秒 タイマーになってしまう。
+      AppState.checkoutSucceeded = true;
+      setTimeout(() => { startCheckoutResultTimer(); }, 0);
     }
 
     function initApp() {
