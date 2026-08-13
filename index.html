@@ -512,7 +512,7 @@
               <thead>
                 <tr>
                   <th class="col-nowrap">受付番号</th>
-                  <th>患者氏名</th>
+                  <th class="col-nowrap">患者氏名</th>
                   <th class="col-nowrap">患者部屋</th>
                   <th class="col-nowrap">面会者署名</th>
                   <th>関係</th>
@@ -3144,7 +3144,7 @@ var qrcode = function() {
       return `
         <tr>
           <td class="col-nowrap">${entry.visitId}</td>
-          <td>${patientName}</td>
+          <td class="col-nowrap">${patientName}</td>
           <td class="col-nowrap">${entry.roomNo}号室</td>
           <td class="col-nowrap" style="text-align: center;">
             <button onclick="showSignature('${entry.visitId}')" style="padding: 3px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
