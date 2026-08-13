@@ -196,6 +196,10 @@
     .admin-table tbody tr:nth-child(even) { background-color: #FAFAFA; }
     .admin-table tbody tr:hover { background-color: var(--color-primary-light); }
     .admin-table .col-nowrap, .admin-table td.col-nowrap { white-space: nowrap; }
+    .admin-th-sortable { cursor: pointer; user-select: none; }
+    .admin-th-sortable:hover { background-color: #DCEEDF; }
+    .admin-th-sortable.is-sorted { background-color: #CFE8D5; }
+    .admin-th-arrow { display: inline-block; margin-left: 3px; font-size: 10px; }
   </style>
 </head>
 <body>
@@ -510,12 +514,12 @@
           <div class="admin-table-wrap">
             <table class="admin-table">
               <thead>
-                <tr>
+                <tr id="admin-table-head-row">
                   <th class="col-nowrap">受付番号</th>
                   <th class="col-nowrap">患者氏名</th>
                   <th class="col-nowrap">患者部屋</th>
                   <th class="col-nowrap">面会者署名</th>
-                  <th>関係</th>
+                  <th class="col-nowrap">関係</th>
                   <th class="col-nowrap">人数</th>
                   <th class="col-nowrap">入館時間</th>
                   <th class="col-nowrap">退館時間</th>
@@ -3149,7 +3153,7 @@ var qrcode = function() {
           <td class="col-nowrap" style="text-align: center;">
             <button onclick="showSignature('${entry.visitId}')" style="padding: 3px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
           </td>
-          <td>${entry.relation}</td>
+          <td class="col-nowrap">${entry.relation}</td>
           <td class="col-nowrap">${entry.visitorCount}名</td>
           <td class="col-nowrap">${entry.displayTime}</td>
           <td class="col-nowrap">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
@@ -3158,43 +3162,98 @@ var qrcode = function() {
       `;
     }
 
-    function loadAdminDashboard() {
-      console.log('loadAdminDashboard が呼ばれました');
-      const log = getVisitLog();
-      const master = fetchPatientMaster();
-      const tbody = document.getElementById('admin-table-body');
+    // 管理画面テーブルの並び替え状態。
+    // 【並び順の不具合修正】以前は面会ログ配列（＝古い記録が先頭）をそのまま表示していたため、
+    // 直近の来客ほど一番下に埋もれてしまっていた。デフォルトを「入館時間の新しい順」にする。
+    let AdminSortState = { key: 'checkin', dir: 'desc' };
 
-      console.log('訪問記録数:', log.length);
-      console.log('tbody 要素:', tbody);
+    // 列ごとの「初めてその見出しをクリックしたときのデフォルト方向」。
+    // 時刻・受付番号（＝時刻とほぼ同義）は新しい順、状態は滞在中を先に、それ以外は昇順が直感的。
+    const ADMIN_SORT_DEFAULT_DIR = {
+      visitId: 'asc',
+      patientName: 'asc',
+      roomNo: 'asc',
+      visitorCount: 'asc',
+      checkin: 'desc',
+      checkout: 'desc',
+      status: 'asc'
+    };
 
-      if (!tbody) {
-        console.error('admin-table-body が見つかりません');
-        return;
+    // 見出し行の定義（key が null の列は並び替え非対応：面会者署名は画像表示ボタンのみ、関係は自由記述のため）
+    const ADMIN_SORT_COLUMNS = [
+      { key: 'visitId', label: '受付番号' },
+      { key: 'patientName', label: '患者氏名' },
+      { key: 'roomNo', label: '患者部屋' },
+      { key: null, label: '面会者署名' },
+      { key: null, label: '関係' },
+      { key: 'visitorCount', label: '人数' },
+      { key: 'checkin', label: '入館時間' },
+      { key: 'checkout', label: '退館時間' },
+      { key: 'status', label: '状態' }
+    ];
+
+    function getAdminSortValue(entry, master, key) {
+      switch (key) {
+        case 'visitId': return entry.visitId || '';
+        case 'patientName': return resolvePatientDisplayName(entry, master);
+        case 'roomNo': return parseInt(entry.roomNo, 10) || 0;
+        case 'visitorCount': return entry.visitorCount || 0;
+        // ISO文字列（生のタイムスタンプ）があればそれを使い、旧形式ログは表示用文字列で代用する
+        case 'checkin': return entry.timestamp || entry.displayTime || '';
+        case 'checkout': return entry.checkoutTimestamp || entry.checkoutTime || '';
+        // 滞在中(0)を退館済(1)より小さい値にしておくと、昇順クリックで「まだ帰っていない人」が先頭に来る
+        case 'status': return entry.checkoutTime ? 1 : 0;
+        default: return '';
       }
-
-      if (log.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
-        console.log('テーブルが更新されました（データなし）');
-        return;
-      }
-
-      tbody.innerHTML = log.map(entry => buildAdminRow(entry, master)).join('');
-
-      console.log('テーブルが更新されました（データあり）');
     }
 
-    function applyAdminFilters() {
-      const log = getVisitLog();
-      const master = fetchPatientMaster();
-      const tbody = document.getElementById('admin-table-body');
+    function sortAdminEntries(entries, master) {
+      const { key, dir } = AdminSortState;
+      return entries.slice().sort((a, b) => {
+        const va = getAdminSortValue(a, master, key);
+        const vb = getAdminSortValue(b, master, key);
+        // 退館時間で並び替える場合、まだ退館していない（値が無い）行は方向に関わらず常に末尾へ
+        if (key === 'checkout') {
+          const aEmpty = !va;
+          const bEmpty = !vb;
+          if (aEmpty && !bEmpty) return 1;
+          if (!aEmpty && bEmpty) return -1;
+          if (aEmpty && bEmpty) return 0;
+        }
+        if (va < vb) return dir === 'asc' ? -1 : 1;
+        if (va > vb) return dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
 
+    function setAdminSort(key) {
+      if (AdminSortState.key === key) {
+        AdminSortState.dir = AdminSortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        AdminSortState.key = key;
+        AdminSortState.dir = ADMIN_SORT_DEFAULT_DIR[key] || 'asc';
+      }
+      renderAdminTable();
+    }
+
+    function buildAdminHeaderRow() {
+      return ADMIN_SORT_COLUMNS.map(col => {
+        if (!col.key) {
+          return `<th class="col-nowrap">${col.label}</th>`;
+        }
+        const isActive = AdminSortState.key === col.key;
+        const arrow = isActive ? `<span class="admin-th-arrow">${AdminSortState.dir === 'asc' ? '▲' : '▼'}</span>` : '';
+        return `<th class="col-nowrap admin-th-sortable${isActive ? ' is-sorted' : ''}" onclick="setAdminSort('${col.key}')">${col.label}${arrow}</th>`;
+      }).join('');
+    }
+
+    function getFilteredAdminEntries(log, master) {
       const floor = document.getElementById('admin-filter-floor').value;
       const room = document.getElementById('admin-filter-room').value;
       const date = document.getElementById('admin-filter-date').value;
       const patient = document.getElementById('admin-filter-patient').value;
 
-      // フィルタリング
-      let filtered = log.filter(entry => {
+      return log.filter(entry => {
         // フロア検索：部屋番号の頭の数字
         if (floor && entry.roomNo.charAt(0) !== floor) return false;
         // 部屋番号検索
@@ -3208,6 +3267,30 @@ var qrcode = function() {
         }
         return true;
       });
+    }
+
+    // 検索フィルターと並び替えの両方を適用してテーブルを再描画する共通処理。
+    // ログイン直後の初期表示（loadAdminDashboard）と検索ボタン（applyAdminFilters）、
+    // 見出しクリックによる並び替え（setAdminSort）の全てがここを通る。
+    function renderAdminTable() {
+      const log = getVisitLog();
+      const master = fetchPatientMaster();
+      const tbody = document.getElementById('admin-table-body');
+      const headRow = document.getElementById('admin-table-head-row');
+
+      if (!tbody) {
+        console.error('admin-table-body が見つかりません');
+        return;
+      }
+
+      if (headRow) headRow.innerHTML = buildAdminHeaderRow();
+
+      if (log.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
+        return;
+      }
+
+      const filtered = sortAdminEntries(getFilteredAdminEntries(log, master), master);
 
       if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
@@ -3215,6 +3298,14 @@ var qrcode = function() {
       }
 
       tbody.innerHTML = filtered.map(entry => buildAdminRow(entry, master)).join('');
+    }
+
+    function loadAdminDashboard() {
+      renderAdminTable();
+    }
+
+    function applyAdminFilters() {
+      renderAdminTable();
     }
     function showSignature(visitId) {
       const log = getVisitLog();
@@ -3435,7 +3526,8 @@ var qrcode = function() {
         visitorCount: AppState.visitorCount,
         phoneNumber: AppState.phoneNumber,
         entryType: AppState.entryType,
-        checkoutTime: null
+        checkoutTime: null,
+        checkoutTimestamp: null
       };
 
       log.push(record);
@@ -3927,9 +4019,10 @@ var qrcode = function() {
         return;
       }
 
-      // チェックアウト時刻を記録
+      // チェックアウト時刻を記録（表示用の文字列と、並び替え用の生タイムスタンプの両方を保持）
       const now = new Date();
       entry.checkoutTime = formatTimestamp(now);
+      entry.checkoutTimestamp = now.toISOString();
 
       // localStorage に保存
       // 【重要】ここで saveVisitLog() を呼んではいけない。saveVisitLog() は
