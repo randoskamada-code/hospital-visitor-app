@@ -73,12 +73,16 @@
     .pass-id { text-align: center; font-size: var(--fs-md); font-weight: 600; margin-top: 10px; }
     .no-print { display: block; }
     @media print {
-      body * { visibility: hidden; }
-      #visit-pass, #visit-pass * { visibility: visible; }
-      #visit-pass { position: absolute; left: 0; top: 0; width: 90mm; height: 60mm; padding: 4mm; box-sizing: border-box; border: none; background: #fff; color: #000; font-size: 11pt; }
-      #visit-pass .pass-room { font-size: 20pt; font-weight: 900; }
-      #visit-pass .pass-name { font-size: 24pt; font-weight: 900; }
-      #visit-pass .pass-sign img { max-width: 60mm; max-height: 15mm; }
+      * { margin: 0; padding: 0; }
+      body { background: white; }
+      body > * { display: none; }
+      #visit-pass { display: block !important; width: 90mm; height: 60mm; padding: 4mm; box-sizing: border-box; border: 2px solid #000; background: #fff; color: #000; font-size: 11pt; page-break-after: avoid; margin: 0; position: static; }
+      #visit-pass * { display: block; margin: 0; }
+      #visit-pass .pass-room { font-size: 20pt; font-weight: 900; text-align: center; margin: 2mm 0; }
+      #visit-pass .pass-name { font-size: 16pt; font-weight: 900; text-align: center; margin: 2mm 0; }
+      #visit-pass .pass-sign { text-align: center; margin: 2mm 0; }
+      #visit-pass .pass-sign img { max-width: 50mm; max-height: 12mm; display: inline-block; }
+      #visit-pass .pass-id { font-size: 10pt; text-align: center; margin: 2mm 0; }
       .no-print { display: none !important; }
       @page { size: 90mm 60mm; margin: 0; }
     }
@@ -573,10 +577,12 @@
       if (signatureCanvas) clearSignature();
       document.getElementById('relation-selected').textContent = '';
 
-      // 完了画面の表示をリセット
+      // 完了画面の表示をリセット（署名を確実にクリア）
       document.getElementById('pass-room').textContent = '';
       document.getElementById('pass-name').textContent = '';
-      document.getElementById('pass-sign').innerHTML = '';
+      const passSign = document.getElementById('pass-sign');
+      passSign.innerHTML = '';
+      passSign.textContent = '';
       document.getElementById('pass-relation').textContent = '';
       document.getElementById('pass-count').textContent = '';
       document.getElementById('pass-time').textContent = '';
@@ -664,8 +670,21 @@
       }
 
       tbody.innerHTML = log.map((entry, idx) => {
-        const patient = master.find(p => p.patientId === entry.patientId);
-        const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji}` : '不明';
+        // 患者名表示：レコードに新しい形式があればそれを使用、なければマスターから取得
+        let patientName = '不明';
+        if (entry.patientFirstNameKanji) {
+          // 新形式：姓漢字 + 名漢字
+          patientName = `${entry.patientLastNameKanji}${entry.patientFirstNameKanji}`;
+        } else if (entry.patientLastNameKanji) {
+          // 旧形式：姓漢字のみ
+          const patient = master.find(p => p.patientId === entry.patientId);
+          if (patient) {
+            patientName = `${patient.lastNameKanji}${patient.firstNameKanji}`;
+          } else {
+            patientName = entry.patientLastNameKanji;
+          }
+        }
+
         const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
         const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
         const visitorName = entry.visitorSignature ? '署名あり' : '署名なし';
@@ -708,11 +727,18 @@
         if (room && !entry.roomNo.includes(room)) return false;
         // 日付検索
         if (date && !entry.displayTime.includes(date)) return false;
-        // 患者名検索（姓と名の漢字両方で検索）
+        // 患者名検索（新旧形式に対応）
         if (patient) {
-          const p = master.find(m => m.patientId === entry.patientId);
-          const fullName = p ? `${p.lastNameKanji}${p.firstNameKanji}` : '';
-          if (!p || !fullName.includes(patient)) return false;
+          let searchName = '';
+          if (entry.patientFirstNameKanji) {
+            // 新形式
+            searchName = `${entry.patientLastNameKanji}${entry.patientFirstNameKanji}`;
+          } else if (entry.patientLastNameKanji) {
+            // 旧形式：マスターから完全名を取得
+            const p = master.find(m => m.patientId === entry.patientId);
+            searchName = p ? `${p.lastNameKanji}${p.firstNameKanji}` : entry.patientLastNameKanji;
+          }
+          if (!searchName.includes(patient)) return false;
         }
         return true;
       });
@@ -723,8 +749,20 @@
       }
 
       tbody.innerHTML = filtered.map((entry, idx) => {
-        const p = master.find(m => m.patientId === entry.patientId);
-        const patientName = p ? `${p.lastNameKanji}${p.firstNameKanji}` : '不明';
+        // 患者名表示：レコードに新しい形式があればそれを使用、なければマスターから取得
+        let patientName = '不明';
+        if (entry.patientFirstNameKanji) {
+          // 新形式：姓漢字 + 名漢字
+          patientName = `${entry.patientLastNameKanji}${entry.patientFirstNameKanji}`;
+        } else if (entry.patientLastNameKanji) {
+          // 旧形式：姓漢字のみ
+          const p = master.find(m => m.patientId === entry.patientId);
+          if (p) {
+            patientName = `${p.lastNameKanji}${p.firstNameKanji}`;
+          } else {
+            patientName = entry.patientLastNameKanji;
+          }
+        }
         const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
         const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
 
@@ -867,24 +905,37 @@
 
     function saveVisitLog() {
       const log = getVisitLog();
-      const now = new Date();
-      log.push({
-        visitId: generateVisitId(),
-        timestamp: now.toISOString(),
-        displayTime: formatTimestamp(now),
+
+      // AppState.lastVisitRecord を使用（submitNewVisit()で作成済み）
+      if (!AppState.lastVisitRecord || !AppState.selectedPatient) {
+        console.error('訪問記録の保存に必要な情報が不足しています');
+        return;
+      }
+
+      const record = {
+        visitId: AppState.lastVisitRecord.visitId,
+        timestamp: AppState.lastVisitRecord.timestamp,
+        displayTime: AppState.lastVisitRecord.displayTime,
         patientId: AppState.selectedPatient.patientId,
         roomNo: AppState.selectedPatient.roomNo,
         patientLastNameKanji: AppState.selectedPatient.lastNameKanji,
+        patientFirstNameKanji: AppState.selectedPatient.firstNameKanji,
         visitorSignature: AppState.signatureData,
         relation: AppState.relation,
         relationOther: AppState.relationOther,
         visitorCount: AppState.visitorCount,
         phoneNumber: AppState.phoneNumber,
-        entryType: AppState.entryType
-      });
+        entryType: AppState.entryType,
+        checkoutTime: null
+      };
+
+      log.push(record);
       try {
         localStorage.setItem('vms_visit_log', JSON.stringify(log));
-      } catch (e) {}
+        console.log('✓ 訪問記録を保存しました:', record.visitId);
+      } catch (e) {
+        console.error('localStorage 保存エラー:', e);
+      }
     }
 
     function generateVisitId() {
@@ -1267,31 +1318,33 @@
       qrContainer.innerHTML = '';
 
       // QRコードライブラリの読み込み確認
-      const tryGenerateQR = () => {
+      const tryGenerateQR = (retries = 0) => {
         if (typeof QRCode !== 'undefined') {
           try {
-            // 既存のcanvasをクリア
+            // 既存の内容をクリア
             qrContainer.innerHTML = '';
-            const canvas = document.createElement('canvas');
-            qrContainer.appendChild(canvas);
 
-            new QRCode(canvas, {
+            // QRCode ライブラリは div に直接生成する
+            new QRCode(qrContainer, {
               text: visitId,
-              width: 200,
-              height: 200,
+              width: 180,
+              height: 180,
               colorDark: "#000000",
               colorLight: "#ffffff",
               correctLevel: QRCode.CorrectLevel.H
             });
-            console.log('QRコードが正常に生成されました');
+            console.log('✓ QRコードが正常に生成されました:', visitId);
           } catch (e) {
             console.error('QRコード生成エラー:', e);
-            qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px;">QRコード: ${visitId}</div>`;
+            qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px; padding: 10px;">QRコード生成失敗<br>${visitId}</div>`;
           }
+        } else if (retries < 5) {
+          // ライブラリがまだ読み込まれていない場合は、再度確認（最大5回）
+          console.warn(`QRCodeライブラリ読み込み待機中... (${retries + 1}/5)`);
+          setTimeout(() => tryGenerateQR(retries + 1), 200);
         } else {
-          // ライブラリがまだ読み込まれていない場合は、再度確認
-          console.warn('QRCodeライブラリが読み込まれていません。100ms後に再試行します。');
-          setTimeout(tryGenerateQR, 100);
+          console.error('QRCodeライブラリが読み込まれませんでした');
+          qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px;">訪問ID: ${visitId}</div>`;
         }
       };
 
