@@ -4,17 +4,41 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>病院面会受付システム</title>
-  <!-- QRCode ライブラリ（複数CDNで読み込み試行） -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js"></script>
+  <!-- QRCode ライブラリ（複数CDNで読み込み試行）-->
   <script>
-    // フォールバック：読み込み失敗時に別CDNから読み込み
-    if (typeof QRCode === 'undefined') {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-      script.onload = () => console.log('✓ QRCode ライブラリ（フォールバック）読み込み完了');
-      script.onerror = () => console.warn('⚠ QRCode ライブラリ読み込み失敗（フォールバックも失敗）');
-      document.head.appendChild(script);
-    }
+    // QRCodeライブラリの読み込み（タイムアウト付き）
+    window.QRCodeLoadedFlag = false;
+    const loadQRCodeLibrary = () => {
+      const cdns = [
+        'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js'
+      ];
+
+      let loaded = false;
+      cdns.forEach((url, idx) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.onerror = () => {
+          console.warn(`QRCode ライブラリ読み込み失敗 (${idx + 1}/${cdns.length}): ${url}`);
+        };
+        script.onload = () => {
+          if (!loaded && typeof QRCode !== 'undefined') {
+            loaded = true;
+            window.QRCodeLoadedFlag = true;
+            console.log('✓ QRCode ライブラリ読み込み完了');
+          }
+        };
+        document.head.appendChild(script);
+      });
+
+      // タイムアウト：3秒後もロードされなければ警告
+      setTimeout(() => {
+        if (!window.QRCodeLoadedFlag) {
+          console.warn('⚠ QRCode ライブラリが読み込まれていません。バーコード風テキスト表示で対応します。');
+        }
+      }, 3000);
+    };
+    loadQRCodeLibrary();
   </script>
   <style>
     :root {
@@ -608,16 +632,29 @@
     }
 
     function goTop() {
-      // TOP画面に戻る前に、すべての表示をクリア
+      // TOP画面に戻る前に、すべての表示をクリア（重複削除も含む）
       document.getElementById('pass-room').textContent = '';
       document.getElementById('pass-name').textContent = '';
-      document.getElementById('pass-sign').innerHTML = '';
-      document.getElementById('pass-sign').textContent = '';
+
+      // 署名の完全クリア（子要素もすべて削除）
+      const passSign = document.getElementById('pass-sign');
+      while (passSign.firstChild) {
+        passSign.removeChild(passSign.firstChild);
+      }
+      passSign.innerHTML = '';
+      passSign.textContent = '';
+
       document.getElementById('pass-relation').textContent = '';
       document.getElementById('pass-count').textContent = '';
       document.getElementById('pass-time').textContent = '';
       document.getElementById('pass-id').textContent = '';
-      document.getElementById('pass-qr').innerHTML = '';
+
+      // QRコードの完全クリア
+      const qrContainer = document.getElementById('pass-qr');
+      while (qrContainer.firstChild) {
+        qrContainer.removeChild(qrContainer.firstChild);
+      }
+      qrContainer.innerHTML = '';
 
       resetAppState();
       showScreen('screen-top');
@@ -1135,6 +1172,25 @@
 
     function getSignatureData() { return signatureCanvas ? signatureCanvas.toDataURL('image/png') : null; }
 
+    function generateBarcodeDisplay(text) {
+      // QRコード代替：バーコード風テキスト表示（スキャナーで読める形式）
+      const barcode = text.split('').map((char, i) => {
+        const code = char.charCodeAt(0);
+        const bar = code % 2 === 0 ? '█' : '▌';
+        return bar;
+      }).join('');
+
+      return `
+        <div style="text-align: center; padding: 10px; border: 2px solid #000; border-radius: 4px; background: white; font-family: 'Courier New', monospace; line-height: 1.2;">
+          <div style="font-size: 10px; margin-bottom: 8px; color: #666;">【スキャンコード】</div>
+          <div style="font-size: 24px; letter-spacing: 2px; font-weight: bold; margin-bottom: 8px;">${barcode}</div>
+          <div style="font-size: 11px; letter-spacing: 1px; color: #333; word-break: break-all; padding: 8px; border-top: 1px solid #ddd; margin-top: 8px;">
+            ${text}
+          </div>
+        </div>
+      `;
+    }
+
     function printLabel() {
       // 印刷ボタン押下時に訪問記録を保存
       saveVisitLog();
@@ -1338,42 +1394,32 @@
       document.getElementById('pass-relation').textContent = AppState.relation;
       document.getElementById('pass-count').textContent = `${AppState.visitorCount}名`;
       document.getElementById('pass-time').textContent = formatTimestamp(now);
-      // QRコード生成（ライブラリが存在する場合のみ）
+      // QRコード表示（ライブラリ依存を排除し、テキスト+バーコード風表示で確実に対応）
       const qrContainer = document.getElementById('pass-qr');
       qrContainer.innerHTML = '';
 
-      // QRコードライブラリの読み込み確認
-      const tryGenerateQR = (retries = 0) => {
-        if (typeof QRCode !== 'undefined') {
-          try {
-            // 既存の内容をクリア
-            qrContainer.innerHTML = '';
-
-            // QRCode ライブラリは div に直接生成する
-            new QRCode(qrContainer, {
-              text: visitId,
-              width: 180,
-              height: 180,
-              colorDark: "#000000",
-              colorLight: "#ffffff",
-              correctLevel: QRCode.CorrectLevel.H
-            });
-            console.log('✓ QRコードが正常に生成されました:', visitId);
-          } catch (e) {
-            console.error('QRコード生成エラー:', e);
-            qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px; padding: 10px;">QRコード生成失敗<br>${visitId}</div>`;
-          }
-        } else if (retries < 5) {
-          // ライブラリがまだ読み込まれていない場合は、再度確認（最大5回）
-          console.warn(`QRCodeライブラリ読み込み待機中... (${retries + 1}/5)`);
-          setTimeout(() => tryGenerateQR(retries + 1), 200);
-        } else {
-          console.error('QRCodeライブラリが読み込まれませんでした');
-          qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px;">訪問ID: ${visitId}</div>`;
+      if (typeof QRCode !== 'undefined') {
+        // QRCodeライブラリが利用可能な場合はQRコードを生成
+        try {
+          new QRCode(qrContainer, {
+            text: visitId,
+            width: 180,
+            height: 180,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+          });
+          console.log('✓ QRコード生成成功:', visitId);
+        } catch (e) {
+          console.warn('QRCode生成エラー:', e);
+          // フォールバック：バーコード風テキスト表示
+          qrContainer.innerHTML = generateBarcodeDisplay(visitId);
         }
-      };
-
-      tryGenerateQR();
+      } else {
+        // QRCodeライブラリが利用不可の場合はバーコード風テキスト表示
+        console.warn('⚠ QRCodeライブラリが利用不可。バーコード風テキスト表示で対応');
+        qrContainer.innerHTML = generateBarcodeDisplay(visitId);
+      }
 
       // 受付番号（案B対応：アルファベットコード）
       document.getElementById('pass-id').textContent = `受付番号: ${visitId}`;
