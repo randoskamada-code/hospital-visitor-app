@@ -178,6 +178,22 @@
           <div class="timer-text">(15秒後に自動で戻ります)</div>
         </div>
       </section>
+
+      <!-- チェックアウト画面 -->
+      <section class="screen" id="screen-checkout">
+        <button class="back-button" onclick="goTop()">← 最初に戻る</button>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">退館手続き</div>
+        <div class="screen-content">
+          <div style="font-size: var(--fs-sm); margin-bottom: 30px; text-align: center;">
+            <div style="margin-bottom: 20px;">面会証のQRコードをスキャンするか、</div>
+            <div>受付番号を入力してください</div>
+          </div>
+          <input type="text" id="checkout-input" style="width: 80%; padding: 16px; font-size: var(--fs-md); border: var(--border-w) solid var(--color-border); border-radius: var(--radius); font-family: inherit; text-align: center; letter-spacing: 2px; margin-bottom: 20px;" placeholder="受付番号を入力" autocomplete="off" onkeypress="if(event.key==='Enter') submitCheckout()">
+          <div id="checkout-result" style="margin: 20px 0; width: 90%; text-align: center;"></div>
+          <button class="btn-large" onclick="submitCheckout()">確認</button>
+        </div>
+      </section>
+
       <section class="screen" id="screen-sign">
         <button class="back-button" onclick="goBack()">← 戻る</button>
         <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">面会される方のお名前をご記入ください</div>
@@ -446,26 +462,26 @@
     }
 
     const SEED_PATIENT_MASTER = [
-      { patientId: "P0001", roomNo: "301", lastNameKana: "やまだ", firstNameKana: "たろう", lastNameKanji: "山田", initial: "T.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0002", roomNo: "301", lastNameKana: "さとう", firstNameKana: "はなこ", lastNameKanji: "佐藤", initial: "H.S.", restricted: false, restrictReason: "" },
-      { patientId: "P0003", roomNo: "302", lastNameKana: "すずき", firstNameKana: "いちろう", lastNameKanji: "鈴木", initial: "I.S.", restricted: true, restrictReason: "面会禁止" },
-      { patientId: "P0004", roomNo: "302", lastNameKana: "たなか", firstNameKana: "よしお", lastNameKanji: "田中", initial: "Y.T.", restricted: false, restrictReason: "" },
-      { patientId: "P0005", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "じろう", lastNameKanji: "山田", initial: "J.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0006", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "さぶろう", lastNameKanji: "山田", initial: "S.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0007", roomNo: "303", lastNameKana: "こばやし", firstNameKana: "みつこ", lastNameKanji: "小林", initial: "M.K.", restricted: false, restrictReason: "" },
-      { patientId: "P0008", roomNo: "401", lastNameKana: "わたなべ", firstNameKana: "けんじ", lastNameKanji: "渡辺", initial: "K.W.", restricted: false, restrictReason: "" },
-      { patientId: "P0009", roomNo: "401", lastNameKana: "いとう", firstNameKana: "あきこ", lastNameKanji: "伊藤", initial: "A.I.", restricted: true, restrictReason: "面会禁止" },
-      { patientId: "P0010", roomNo: "402", lastNameKana: "なかむら", firstNameKana: "しげる", lastNameKanji: "中村", initial: "S.N.", restricted: false, restrictReason: "" },
-      { patientId: "P0011", roomNo: "402", lastNameKana: "やまもと", firstNameKana: "ふみえ", lastNameKanji: "山本", initial: "F.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0012", roomNo: "403", lastNameKana: "かとう", firstNameKana: "まさし", lastNameKanji: "加藤", initial: "M.K.", restricted: false, restrictReason: "" },
-      { patientId: "P0013", roomNo: "403", lastNameKana: "よしだ", firstNameKana: "のぶお", lastNameKanji: "吉田", initial: "N.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0014", roomNo: "501", lastNameKana: "ささき", firstNameKana: "ともこ", lastNameKanji: "佐々木", initial: "T.S.", restricted: false, restrictReason: "" },
-      { patientId: "P0015", roomNo: "501", lastNameKana: "やまぐち", firstNameKana: "たけし", lastNameKanji: "山口", initial: "T.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0016", roomNo: "502", lastNameKana: "まつもと", firstNameKana: "きよし", lastNameKanji: "松本", initial: "K.M.", restricted: false, restrictReason: "" },
-      { patientId: "P0017", roomNo: "502", lastNameKana: "いのうえ", firstNameKana: "みどり", lastNameKanji: "井上", initial: "M.I.", restricted: false, restrictReason: "" },
-      { patientId: "P0018", roomNo: "503", lastNameKana: "きむら", firstNameKana: "ひろし", lastNameKanji: "木村", initial: "H.K.", restricted: true, restrictReason: "面会禁止" },
-      { patientId: "P0019", roomNo: "503", lastNameKana: "はやし", firstNameKana: "かずえ", lastNameKanji: "林", initial: "K.H.", restricted: false, restrictReason: "" },
-      { patientId: "P0020", roomNo: "503", lastNameKana: "しみず", firstNameKana: "ゆうじ", lastNameKanji: "清水", initial: "Y.S.", restricted: false, restrictReason: "" }
+      { patientId: "P0001", roomNo: "301", lastNameKana: "やまだ", firstNameKana: "たろう", lastNameKanji: "山田", firstNameKanji: "太郎", initial: "T.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0002", roomNo: "301", lastNameKana: "さとう", firstNameKana: "はなこ", lastNameKanji: "佐藤", firstNameKanji: "花子", initial: "H.S.", restricted: false, restrictReason: "" },
+      { patientId: "P0003", roomNo: "302", lastNameKana: "すずき", firstNameKana: "いちろう", lastNameKanji: "鈴木", firstNameKanji: "一郎", initial: "I.S.", restricted: true, restrictReason: "面会禁止" },
+      { patientId: "P0004", roomNo: "302", lastNameKana: "たなか", firstNameKana: "よしお", lastNameKanji: "田中", firstNameKanji: "吉男", initial: "Y.T.", restricted: false, restrictReason: "" },
+      { patientId: "P0005", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "じろう", lastNameKanji: "山田", firstNameKanji: "次郎", initial: "J.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0006", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "さぶろう", lastNameKanji: "山田", firstNameKanji: "三郎", initial: "S.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0007", roomNo: "303", lastNameKana: "こばやし", firstNameKana: "みつこ", lastNameKanji: "小林", firstNameKanji: "光子", initial: "M.K.", restricted: false, restrictReason: "" },
+      { patientId: "P0008", roomNo: "401", lastNameKana: "わたなべ", firstNameKana: "けんじ", lastNameKanji: "渡辺", firstNameKanji: "健二", initial: "K.W.", restricted: false, restrictReason: "" },
+      { patientId: "P0009", roomNo: "401", lastNameKana: "いとう", firstNameKana: "あきこ", lastNameKanji: "伊藤", firstNameKanji: "秋子", initial: "A.I.", restricted: true, restrictReason: "面会禁止" },
+      { patientId: "P0010", roomNo: "402", lastNameKana: "なかむら", firstNameKana: "しげる", lastNameKanji: "中村", firstNameKanji: "茂", initial: "S.N.", restricted: false, restrictReason: "" },
+      { patientId: "P0011", roomNo: "402", lastNameKana: "やまもと", firstNameKana: "ふみえ", lastNameKanji: "山本", firstNameKanji: "文恵", initial: "F.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0012", roomNo: "403", lastNameKana: "かとう", firstNameKana: "まさし", lastNameKanji: "加藤", firstNameKanji: "正", initial: "M.K.", restricted: false, restrictReason: "" },
+      { patientId: "P0013", roomNo: "403", lastNameKana: "よしだ", firstNameKana: "のぶお", lastNameKanji: "吉田", firstNameKanji: "信夫", initial: "N.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0014", roomNo: "501", lastNameKana: "ささき", firstNameKana: "ともこ", lastNameKanji: "佐々木", firstNameKanji: "朋子", initial: "T.S.", restricted: false, restrictReason: "" },
+      { patientId: "P0015", roomNo: "501", lastNameKana: "やまぐち", firstNameKana: "たけし", lastNameKanji: "山口", firstNameKanji: "武", initial: "T.Y.", restricted: false, restrictReason: "" },
+      { patientId: "P0016", roomNo: "502", lastNameKana: "まつもと", firstNameKana: "きよし", lastNameKanji: "松本", firstNameKanji: "清", initial: "K.M.", restricted: false, restrictReason: "" },
+      { patientId: "P0017", roomNo: "502", lastNameKana: "いのうえ", firstNameKana: "みどり", lastNameKanji: "井上", firstNameKanji: "緑", initial: "M.I.", restricted: false, restrictReason: "" },
+      { patientId: "P0018", roomNo: "503", lastNameKana: "きむら", firstNameKana: "ひろし", lastNameKanji: "木村", firstNameKanji: "寛", initial: "H.K.", restricted: true, restrictReason: "面会禁止" },
+      { patientId: "P0019", roomNo: "503", lastNameKana: "はやし", firstNameKana: "かずえ", lastNameKanji: "林", firstNameKanji: "和枝", initial: "K.H.", restricted: false, restrictReason: "" },
+      { patientId: "P0020", roomNo: "503", lastNameKana: "しみず", firstNameKana: "ゆうじ", lastNameKanji: "清水", firstNameKanji: "勇治", initial: "Y.S.", restricted: false, restrictReason: "" }
     ];
 
     let AppState = {
@@ -504,6 +520,9 @@
           setTimeout(() => initSignatureCanvas(), 100);
         } else if (screenId === 'screen-top') {
           resetAppState();
+        } else if (screenId === 'screen-checkout') {
+          // チェックアウト画面：スキャナー入力にフォーカス
+          setTimeout(() => document.getElementById('checkout-input').focus(), 100);
         } else if (screenId === 'screen-room') {
           // 戻ってきた場合は roomNo を保持、新規の場合のみクリア
           if (!AppState.roomNo) AppState.inputBuffer = '';
@@ -531,7 +550,7 @@
           });
         }
         updateInputDisplay();
-        if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete') startIdleTimer();
+        if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete' && screenId !== 'screen-checkout') startIdleTimer();
         else if (screenId === 'screen-blocked') startBlockedTimer();
         else if (screenId === 'screen-complete') startCompleteTimer();
       }
@@ -600,7 +619,12 @@
 
     function startNewFlow() { AppState.mode = 'new'; AppState.entryType = 'new'; showScreen('screen-room'); }
     function startRepeatFlow() { AppState.mode = 'repeat'; AppState.entryType = 'repeat'; showScreen('screen-repeat-phone'); }
-    function startCheckoutFlow() { alert('退館手続き画面（未実装）'); }
+    function startCheckoutFlow() {
+      AppState.mode = 'checkout';
+      document.getElementById('checkout-input').value = '';
+      document.getElementById('checkout-result').innerHTML = '';
+      showScreen('screen-checkout');
+    }
 
     function openAdminLogin() {
       document.getElementById('admin-password').value = '';
@@ -641,7 +665,7 @@
 
       tbody.innerHTML = log.map((entry, idx) => {
         const patient = master.find(p => p.patientId === entry.patientId);
-        const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKana}` : '不明';
+        const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji}` : '不明';
         const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
         const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
         const visitorName = entry.visitorSignature ? '署名あり' : '署名なし';
@@ -684,10 +708,11 @@
         if (room && !entry.roomNo.includes(room)) return false;
         // 日付検索
         if (date && !entry.displayTime.includes(date)) return false;
-        // 患者名検索
+        // 患者名検索（姓と名の漢字両方で検索）
         if (patient) {
           const p = master.find(m => m.patientId === entry.patientId);
-          if (!p || !p.lastNameKanji.includes(patient)) return false;
+          const fullName = p ? `${p.lastNameKanji}${p.firstNameKanji}` : '';
+          if (!p || !fullName.includes(patient)) return false;
         }
         return true;
       });
@@ -699,7 +724,7 @@
 
       tbody.innerHTML = filtered.map((entry, idx) => {
         const p = master.find(m => m.patientId === entry.patientId);
-        const patientName = p ? `${p.lastNameKanji}${p.firstNameKana}` : '不明';
+        const patientName = p ? `${p.lastNameKanji}${p.firstNameKanji}` : '不明';
         const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
         const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
 
@@ -1237,27 +1262,43 @@
       document.getElementById('pass-relation').textContent = AppState.relation;
       document.getElementById('pass-count').textContent = `${AppState.visitorCount}名`;
       document.getElementById('pass-time').textContent = formatTimestamp(now);
-      document.getElementById('pass-id').textContent = `受付番号 ${visitId}`;
-
       // QRコード生成（ライブラリが存在する場合のみ）
       const qrContainer = document.getElementById('pass-qr');
       qrContainer.innerHTML = '';
-      if (typeof QRCode !== 'undefined') {
-        try {
-          new QRCode(qrContainer, {
-            text: visitId,
-            width: 150,
-            height: 150,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
-          });
-        } catch (e) {
-          qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px;">QRコード生成エラー</div>`;
+
+      // QRコードライブラリの読み込み確認
+      const tryGenerateQR = () => {
+        if (typeof QRCode !== 'undefined') {
+          try {
+            // 既存のcanvasをクリア
+            qrContainer.innerHTML = '';
+            const canvas = document.createElement('canvas');
+            qrContainer.appendChild(canvas);
+
+            new QRCode(canvas, {
+              text: visitId,
+              width: 200,
+              height: 200,
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.H
+            });
+            console.log('QRコードが正常に生成されました');
+          } catch (e) {
+            console.error('QRコード生成エラー:', e);
+            qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px;">QRコード: ${visitId}</div>`;
+          }
+        } else {
+          // ライブラリがまだ読み込まれていない場合は、再度確認
+          console.warn('QRCodeライブラリが読み込まれていません。100ms後に再試行します。');
+          setTimeout(tryGenerateQR, 100);
         }
-      } else {
-        qrContainer.innerHTML = `<div style="text-align: center; color: #999; font-size: 12px;">訪問ID: ${visitId}</div>`;
-      }
+      };
+
+      tryGenerateQR();
+
+      // 受付番号（案B対応：アルファベットコード）
+      document.getElementById('pass-id').textContent = `受付番号: ${visitId}`;
 
       showScreen('screen-complete');
     }
@@ -1265,6 +1306,46 @@
     function submitRepeatVisit() {
       // saveVisitLog() は printLabel() で呼び出す
       submitNewVisit();
+    }
+
+    function submitCheckout() {
+      const visitId = document.getElementById('checkout-input').value.trim();
+      const log = getVisitLog();
+      const entry = log.find(e => e.visitId === visitId);
+      const resultDiv = document.getElementById('checkout-result');
+
+      if (!entry) {
+        resultDiv.innerHTML = `<div style="color: var(--color-alert); font-size: var(--fs-md); font-weight: 600; margin: 20px 0;">受付番号が見つかりません</div>`;
+        return;
+      }
+
+      if (entry.checkoutTime) {
+        resultDiv.innerHTML = `<div style="color: var(--color-alert); font-size: var(--fs-md); font-weight: 600; margin: 20px 0;">既に退館手続きが済んでいます</div>`;
+        return;
+      }
+
+      // チェックアウト時刻を記録
+      const now = new Date();
+      entry.checkoutTime = formatTimestamp(now);
+
+      // localStorage に保存
+      saveVisitLog();
+
+      // 確認画面を表示
+      const master = fetchPatientMaster();
+      const patient = master.find(p => p.patientId === entry.patientId);
+      const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji}` : '不明';
+
+      resultDiv.innerHTML = `
+        <div style="background-color: var(--color-primary-light); padding: 20px; border-radius: var(--radius); margin: 20px 0; border: 2px solid var(--color-primary);">
+          <div style="font-size: var(--fs-md); margin-bottom: 10px; font-weight: 600;">退館手続き完了</div>
+          <div style="font-size: var(--fs-sm); margin: 10px 0;">患者様: ${patientName}</div>
+          <div style="font-size: var(--fs-sm); margin: 10px 0;">お部屋: ${entry.roomNo}号室</div>
+          <div style="font-size: var(--fs-sm); margin: 10px 0; color: var(--color-text-sub);">入館時刻: ${entry.displayTime}</div>
+          <div style="font-size: var(--fs-sm); margin: 10px 0; color: var(--color-text-sub);">退館時刻: ${entry.checkoutTime}</div>
+        </div>
+        <button class="btn-large" onclick="goTop()" style="margin-top: 20px;">最初に戻る</button>
+      `;
     }
 
     function initApp() {
