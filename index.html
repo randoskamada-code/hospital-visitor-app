@@ -191,6 +191,7 @@
        サイズと不透明度だけを0にする） */
     .checkout-hidden-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; opacity: 0; border: none; }
     .checkout-manual-link { background: none; border: none; color: var(--color-text-sub); text-decoration: underline; font-size: var(--fs-xs); font-weight: 600; padding: 12px; cursor: pointer; }
+    .checkout-camera-switch-btn { display: inline-flex; align-items: center; gap: 6px; background: white; border: 2px solid var(--color-primary); color: var(--color-primary); border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; padding: 8px 18px; cursor: pointer; margin-bottom: 15px; }
     #checkout-manual-view { display: flex; }
     #checkout-manual-display { max-width: 500px; letter-spacing: 6px; }
     /*
@@ -322,6 +323,9 @@
             </div>
             <div class="checkout-scan-title">面会証のQRコードを<br>カメラにかざしてください</div>
             <div class="checkout-scan-sub" id="checkout-camera-status">カメラを起動しています…</div>
+            <!-- 内蔵カメラが複数ある端末（内カメラ・外付けカメラ等）向けの切り替えボタン。
+                 カメラが1台しか検出されない場合は自動的に非表示になる。 -->
+            <button class="checkout-camera-switch-btn" id="checkout-camera-switch-btn" onclick="switchCheckoutCamera()" style="display: none;">🔄 カメラを切り替える</button>
             <input type="text" id="checkout-input" class="checkout-hidden-input" autocomplete="off" onkeypress="if(event.key==='Enter') submitCheckout()">
             <button class="checkout-manual-link" onclick="showCheckoutManualEntry()">QRコードが読み取れない・面会証を紛失した場合はこちら</button>
           </div>
@@ -13611,15 +13615,34 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     let checkoutCameraStream = null;
     let checkoutScanRafId = null;
     let checkoutScanning = false;
+    // 端末に複数カメラ（内カメラ・外付けカメラ等）がある場合の切り替え用。
+    // 一度選んだカメラは次回起動時も使われるよう localStorage に保存する（全デバイス共通の設定ではなく、
+    // 各PC・各ブラウザごとの記憶であることに注意）。
+    let checkoutCameraDevices = [];
+    let checkoutCameraDeviceIndex = -1;
+    const CHECKOUT_CAMERA_PREF_KEY = 'vms_preferred_camera_id';
+    // カメラ起動リクエストの「世代」カウンター。
+    // 【重要】getUserMedia() は非同期なので、起動処理の途中（許可待ち等）で
+    // 画面が手入力に切り替わったり、切り替えボタンが連打されたりすると、
+    // 古い起動リクエストが後から解決して、既に不要になったはずのカメラを
+    // 掴んだままにしてしまう（カメラ使用中ランプが消えない等）ことがある。
+    // stopCheckoutCamera() の度にこの値を進めておき、起動処理の完了時に
+    // 「自分が発行された時点の世代のままか」を確認することで、古いリクエストの
+    // 結果を安全に破棄できるようにする。
+    let checkoutCameraRequestId = 0;
+
+    function getPreferredCheckoutCameraConstraint() {
+      const preferredId = localStorage.getItem(CHECKOUT_CAMERA_PREF_KEY);
+      // 保存されたカメラ機器IDがあればそれを優先。無ければ「内カメラ」を優先するヒントを渡す
+      // （多くのノートPCでは有効だが、外付けUSBカメラ主体のデスクトップ環境では無視されることもある）。
+      return preferredId ? { deviceId: { exact: preferredId } } : { facingMode: 'user' };
+    }
 
     function startCheckoutCamera() {
       // 既に起動中なら何もしない（showCheckoutScanView が複数回呼ばれても二重起動しないように）
       if (checkoutCameraStream) return;
 
       const statusEl = document.getElementById('checkout-camera-status');
-      const frameEl = document.querySelector('#checkout-scan-view .checkout-scan-frame');
-      const iconEl = document.getElementById('checkout-scan-icon');
-      const video = document.getElementById('checkout-camera-video');
 
       // 手入力画面から戻ってきた場合など、前回のカメラ状態の文言（「自動で読み取られます」等）が
       // 残ったままにならないよう、起動処理を始める前に必ず「起動しています…」表示にリセットする。
@@ -13639,30 +13662,101 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         return;
       }
 
-      // キオスク端末は内蔵（正面向き）カメラを利用する想定のため、内カメラを優先する
-      // （無ければ既定のカメラが使われる）
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
-        .then(stream => {
-          checkoutCameraStream = stream;
-          video.srcObject = stream;
-          video.play().catch(() => {});
-          if (frameEl) frameEl.classList.add('is-camera-active');
-          if (iconEl) iconEl.classList.add('is-overlay');
-          if (statusEl) {
-            statusEl.textContent = '自動で読み取られます';
-            statusEl.classList.remove('is-error');
-          }
-          checkoutScanning = true;
-          checkoutScanRafId = requestAnimationFrame(scanCheckoutFrame);
-        })
+      const requestId = ++checkoutCameraRequestId;
+      const videoConstraint = getPreferredCheckoutCameraConstraint();
+      navigator.mediaDevices.getUserMedia({ video: videoConstraint })
+        .then(stream => acceptCheckoutCameraStream(requestId, stream))
         .catch(err => {
-          // カメラの権限が拒否された、カメラが無い、他アプリが使用中 等
-          console.error('カメラ起動エラー:', err);
-          if (statusEl) {
-            statusEl.textContent = 'カメラを利用できません（権限が許可されていない可能性があります）。下のリンクから受付番号を入力してください。';
-            statusEl.classList.add('is-error');
+          // 前回選んだカメラが外れている・使えない等で失敗した場合は、既定のカメラで再試行する
+          if (videoConstraint.deviceId) {
+            console.error('保存されたカメラの起動に失敗。既定のカメラで再試行します:', err);
+            localStorage.removeItem(CHECKOUT_CAMERA_PREF_KEY);
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+              .then(stream => acceptCheckoutCameraStream(requestId, stream))
+              .catch(err2 => { if (requestId === checkoutCameraRequestId) onCheckoutCameraError(err2); });
+          } else {
+            if (requestId === checkoutCameraRequestId) onCheckoutCameraError(err);
           }
         });
+    }
+
+    // getUserMedia() の結果を受け取った時点で、まだ自分が最新の起動リクエストかどうかを確認する。
+    // 途中で手入力に切り替えられた／別のカメラへの切り替えが始まっていた等で世代が変わっていれば、
+    // 今取得できたストリームは使わずに直ちに解放する（カメラ使用中ランプが消えないままにならないように）。
+    function acceptCheckoutCameraStream(requestId, stream) {
+      if (requestId !== checkoutCameraRequestId) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      onCheckoutCameraStarted(stream);
+    }
+
+    function onCheckoutCameraStarted(stream) {
+      const statusEl = document.getElementById('checkout-camera-status');
+      const frameEl = document.querySelector('#checkout-scan-view .checkout-scan-frame');
+      const iconEl = document.getElementById('checkout-scan-icon');
+      const video = document.getElementById('checkout-camera-video');
+      checkoutCameraStream = stream;
+      video.srcObject = stream;
+      video.play().catch(() => {});
+      if (frameEl) frameEl.classList.add('is-camera-active');
+      if (iconEl) iconEl.classList.add('is-overlay');
+      if (statusEl) {
+        statusEl.textContent = '自動で読み取られます';
+        statusEl.classList.remove('is-error');
+      }
+      checkoutScanning = true;
+      checkoutScanRafId = requestAnimationFrame(scanCheckoutFrame);
+      refreshCheckoutCameraDeviceList(stream);
+    }
+
+    function onCheckoutCameraError(err) {
+      // カメラの権限が拒否された、カメラが無い、他アプリが使用中 等
+      console.error('カメラ起動エラー:', err);
+      const statusEl = document.getElementById('checkout-camera-status');
+      if (statusEl) {
+        statusEl.textContent = 'カメラを利用できません（権限が許可されていない可能性があります）。下のリンクから受付番号を入力してください。';
+        statusEl.classList.add('is-error');
+      }
+      updateCheckoutCameraSwitchButton();
+    }
+
+    // 現在アクセス可能なカメラの一覧を取得し、2台以上あれば切り替えボタンを表示する。
+    // （ブラウザの仕様上、カメラの権限を一度許可した後でないと機器名やIDが取得できないため、
+    // 　カメラ起動に成功した直後に毎回呼び出している）
+    function refreshCheckoutCameraDeviceList(stream) {
+      if (!navigator.mediaDevices.enumerateDevices) {
+        updateCheckoutCameraSwitchButton();
+        return;
+      }
+      navigator.mediaDevices.enumerateDevices()
+        .then(devices => {
+          checkoutCameraDevices = devices.filter(d => d.kind === 'videoinput');
+          const track = stream.getVideoTracks()[0];
+          const settings = (track && track.getSettings) ? track.getSettings() : {};
+          const currentId = settings.deviceId || '';
+          checkoutCameraDeviceIndex = checkoutCameraDevices.findIndex(d => d.deviceId === currentId);
+          if (checkoutCameraDeviceIndex === -1) checkoutCameraDeviceIndex = 0;
+          updateCheckoutCameraSwitchButton();
+        })
+        .catch(() => { updateCheckoutCameraSwitchButton(); });
+    }
+
+    function updateCheckoutCameraSwitchButton() {
+      const btn = document.getElementById('checkout-camera-switch-btn');
+      if (!btn) return;
+      // カメラが1台しか無い（or 検出できない）環境ではボタンを出さない
+      btn.style.display = (checkoutCameraStream && checkoutCameraDevices.length > 1) ? 'inline-flex' : 'none';
+    }
+
+    // 「🔄 カメラを切り替える」ボタン：検出済みカメラを順番に切り替える。選んだカメラは次回以降も使われる。
+    function switchCheckoutCamera() {
+      if (checkoutCameraDevices.length < 2) return;
+      const nextIndex = (checkoutCameraDeviceIndex + 1) % checkoutCameraDevices.length;
+      const nextDevice = checkoutCameraDevices[nextIndex];
+      localStorage.setItem(CHECKOUT_CAMERA_PREF_KEY, nextDevice.deviceId);
+      stopCheckoutCamera();
+      startCheckoutCamera();
     }
 
     function scanCheckoutFrame() {
@@ -13708,6 +13802,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     }
 
     function stopCheckoutCamera() {
+      // 進行中の起動リクエスト（許可待ち等）があれば、それが後から解決してもストリームを
+      // 破棄するだけになるよう、世代を進めて無効化しておく
+      checkoutCameraRequestId++;
       checkoutScanning = false;
       if (checkoutScanRafId) {
         cancelAnimationFrame(checkoutScanRafId);
@@ -13723,6 +13820,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       const iconEl = document.getElementById('checkout-scan-icon');
       if (frameEl) frameEl.classList.remove('is-camera-active');
       if (iconEl) iconEl.classList.remove('is-overlay');
+      updateCheckoutCameraSwitchButton();
     }
 
     function clearCheckoutManualInput() {
@@ -13781,6 +13879,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const stored = localStorage.getItem('vms_visit_log');
         return stored ? JSON.parse(stored) : [];
       } catch (e) {
+        // 【重要】ここで何もせず単に [] を返すだけだと、この直後に呼ばれる保存処理
+        // （persistVisitLog等）が「壊れたデータ」の代わりに空配列でそのまま
+        // vms_visit_log を上書きしてしまい、停電・強制終了等で書き込み途中の
+        // データが壊れていた場合に、それまでの面会履歴が完全に失われてしまう。
+        // 復旧の可能性を残すため、壊れた生データを別キーへ退避してから
+        // 初期化する（同じ壊れたデータで毎回この処理が走って何度もアラートが
+        // 出ないよう、退避後は vms_visit_log 自体を安全な空配列に戻しておく）。
+        console.error('vms_visit_log の読み込みに失敗しました（データ破損の可能性）:', e);
+        try {
+          const corrupted = localStorage.getItem('vms_visit_log');
+          if (corrupted) {
+            localStorage.setItem('vms_visit_log_corrupted_backup_' + Date.now(), corrupted);
+          }
+          localStorage.setItem('vms_visit_log', '[]');
+        } catch (e2) {}
+        alert('⚠ 面会履歴データの読み込み中に問題が発生しました。\nデータが破損していた可能性があるため、システム担当者にご連絡ください（復旧用に元データは自動的にバックアップされました）。');
         return [];
       }
     }
