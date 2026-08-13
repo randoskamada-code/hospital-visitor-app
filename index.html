@@ -4,7 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>病院面会受付システム</title>
-  <script async src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <!-- QRCode ライブラリ（複数CDNで読み込み試行） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js"></script>
+  <script>
+    // フォールバック：読み込み失敗時に別CDNから読み込み
+    if (typeof QRCode === 'undefined') {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+      script.onload = () => console.log('✓ QRCode ライブラリ（フォールバック）読み込み完了');
+      script.onerror = () => console.warn('⚠ QRCode ライブラリ読み込み失敗（フォールバックも失敗）');
+      document.head.appendChild(script);
+    }
+  </script>
   <style>
     :root {
       --color-bg: #FFFFFF;
@@ -596,7 +607,21 @@
       });
     }
 
-    function goTop() { resetAppState(); showScreen('screen-top'); }
+    function goTop() {
+      // TOP画面に戻る前に、すべての表示をクリア
+      document.getElementById('pass-room').textContent = '';
+      document.getElementById('pass-name').textContent = '';
+      document.getElementById('pass-sign').innerHTML = '';
+      document.getElementById('pass-sign').textContent = '';
+      document.getElementById('pass-relation').textContent = '';
+      document.getElementById('pass-count').textContent = '';
+      document.getElementById('pass-time').textContent = '';
+      document.getElementById('pass-id').textContent = '';
+      document.getElementById('pass-qr').innerHTML = '';
+
+      resetAppState();
+      showScreen('screen-top');
+    }
     function goBack() {
       if (AppState.currentScreen === 'screen-count') {
         showScreen(AppState.mode === 'repeat' ? 'screen-repeat-confirm' : 'screen-relation');
