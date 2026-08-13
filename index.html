@@ -88,27 +88,44 @@
     .no-print { display: block; }
     @media print {
       /*
-        印刷レイアウトについて（重要な修正）：
-        面会証は物理ラベル 90mm×60mm 固定サイズで、パディングを引くと使える面積は
-        約82mm×52mmしかない。旧レイアウトは全項目を縦一列に並べていたため、
-        QRコードを追加すると内容が確実に高さをオーバーフローし、
-        肝心のQRコード・受付番号（退館時のスキャン対象）が印刷範囲からはみ出して
-        印刷されない恐れがあった。
-        そのため印刷時のみ「左：患者情報＋署名（縦積み）／右：QRコード＋受付番号」の
-        横2カラムレイアウトに変更し、90mm の横幅を有効活用して60mmの高さに収める。
+        印刷レイアウトについて（重要な修正・2回目）：
+
+        [修正1] 面会証以外が印字されてしまう不具合（QRコードが右上にずれる／
+        「20秒後に自動で最初の画面に戻ります」の文言が一緒に印字される）について：
+        以前は `body > * { display: none; }` で #app 全体を非表示にし、
+        その内部にある #visit-pass だけを `display: block/flex !important` で
+        再度表示しようとしていた。しかし CSS の仕様上、祖先要素が display:none に
+        なった時点でその子孫は「どんな display 値を指定しても」描画されない
+        （display:none は子孫側から上書きできない）。そのため実際のブラウザ印刷では
+        意図通りに他要素が消えず、レイアウトが崩れたまま印刷されてしまっていた。
+        正しくは visibility を使う方法（非表示にしたい範囲は visibility:hidden、
+        見せたい範囲だけ visibility:visible で個別に復帰させる）。
+        visibility は子孫側から visible に戻せるため、確実に #visit-pass 以外を
+        非表示にできる。さらに #visit-pass は position:fixed で用紙左上に固定し、
+        非表示领域のレイアウト位置に影響されないようにする。
+
+        [修正2] 90mm×60mmラベルの面積不足について：
+        パディングを引くと使える面積は約82mm×52mmしかない。全項目を縦一列に
+        並べるとQRコード追加分で確実に高さをオーバーフローするため、
+        「左：患者情報＋署名（縦積み）／右：QRコード＋受付番号」の横2カラム
+        レイアウトにして90mmの横幅を有効活用し、60mmの高さに収めている。
         画面上のプレビュー（screen-complete）は従来どおり縦一列表示のまま変更しない。
       */
       * { margin: 0; padding: 0; }
-      body { background: white; }
-      body > * { display: none; }
+      html, body { background: white; }
+      body * { visibility: hidden; }
+      #visit-pass, #visit-pass * { visibility: visible; }
       #visit-pass {
+        visibility: visible;
         display: flex !important;
         flex-direction: row !important;
         align-items: stretch;
         gap: 2mm;
+        position: fixed !important;
+        left: 0; top: 0;
         width: 90mm; height: 60mm; padding: 4mm; box-sizing: border-box;
         border: 2px solid #000; background: #fff; color: #000; font-size: 11pt;
-        page-break-after: avoid; margin: 0; position: static;
+        margin: 0;
         overflow: hidden;
       }
       #visit-pass * { display: block; margin: 0; }
@@ -3037,6 +3054,28 @@ var qrcode = function() {
       }
     }
 
+    function resolvePatientDisplayName(entry, master) {
+      // 面会ログ1件から患者氏名（姓＋名の漢字）を組み立てる。
+      // 【「山田undefined」不具合の修正】
+      // 以前は `${entry.patientLastNameKanji}${entry.patientFirstNameKanji}` のように
+      // 未定義の可能性がある値をテンプレートリテラルへ直接埋め込んでいたため、
+      // firstNameKanji が存在しない（＝古いスキーマの患者マスタがキャッシュされている等）
+      // レコードでは氏名の末尾に文字どおり "undefined" という文字列が表示されてしまっていた。
+      // ここでは必ず文字列にフォールバックしてから連結する。
+      if (entry.patientFirstNameKanji) {
+        return `${entry.patientLastNameKanji || ''}${entry.patientFirstNameKanji}`;
+      }
+      if (entry.patientLastNameKanji) {
+        // 旧形式のログ（姓漢字のみ保存）：現在のマスタから正式な氏名を引き直す
+        const patient = master.find(p => p.patientId === entry.patientId);
+        if (patient) {
+          return `${patient.lastNameKanji || ''}${patient.firstNameKanji || ''}`;
+        }
+        return entry.patientLastNameKanji;
+      }
+      return '不明';
+    }
+
     function loadAdminDashboard() {
       console.log('loadAdminDashboard が呼ばれました');
       const log = getVisitLog();
@@ -3058,20 +3097,7 @@ var qrcode = function() {
       }
 
       tbody.innerHTML = log.map((entry, idx) => {
-        // 患者名表示：レコードに新しい形式があればそれを使用、なければマスターから取得
-        let patientName = '不明';
-        if (entry.patientFirstNameKanji) {
-          // 新形式：姓漢字 + 名漢字
-          patientName = `${entry.patientLastNameKanji}${entry.patientFirstNameKanji}`;
-        } else if (entry.patientLastNameKanji) {
-          // 旧形式：姓漢字のみ
-          const patient = master.find(p => p.patientId === entry.patientId);
-          if (patient) {
-            patientName = `${patient.lastNameKanji}${patient.firstNameKanji}`;
-          } else {
-            patientName = entry.patientLastNameKanji;
-          }
-        }
+        const patientName = resolvePatientDisplayName(entry, master);
 
         const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
         const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
@@ -3117,15 +3143,7 @@ var qrcode = function() {
         if (date && !entry.displayTime.includes(date)) return false;
         // 患者名検索（新旧形式に対応）
         if (patient) {
-          let searchName = '';
-          if (entry.patientFirstNameKanji) {
-            // 新形式
-            searchName = `${entry.patientLastNameKanji}${entry.patientFirstNameKanji}`;
-          } else if (entry.patientLastNameKanji) {
-            // 旧形式：マスターから完全名を取得
-            const p = master.find(m => m.patientId === entry.patientId);
-            searchName = p ? `${p.lastNameKanji}${p.firstNameKanji}` : entry.patientLastNameKanji;
-          }
+          const searchName = resolvePatientDisplayName(entry, master);
           if (!searchName.includes(patient)) return false;
         }
         return true;
@@ -3137,20 +3155,7 @@ var qrcode = function() {
       }
 
       tbody.innerHTML = filtered.map((entry, idx) => {
-        // 患者名表示：レコードに新しい形式があればそれを使用、なければマスターから取得
-        let patientName = '不明';
-        if (entry.patientFirstNameKanji) {
-          // 新形式：姓漢字 + 名漢字
-          patientName = `${entry.patientLastNameKanji}${entry.patientFirstNameKanji}`;
-        } else if (entry.patientLastNameKanji) {
-          // 旧形式：姓漢字のみ
-          const p = master.find(m => m.patientId === entry.patientId);
-          if (p) {
-            patientName = `${p.lastNameKanji}${p.firstNameKanji}`;
-          } else {
-            patientName = entry.patientLastNameKanji;
-          }
-        }
+        const patientName = resolvePatientDisplayName(entry, master);
         const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
         const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
 
@@ -3271,13 +3276,26 @@ var qrcode = function() {
 
     function validatePhone(digits) { return digits.length === 10 || digits.length === 11; }
 
+    // SEED_PATIENT_MASTER のスキーマ（フィールド構成）を変更したら、このバージョン文字列も
+    // 必ず更新すること。localStorage に古いスキーマのデータがキャッシュされたまま残っていると、
+    // 新しいコードが期待するフィールド（例：firstNameKanji）が無く、管理画面に「山田undefined」
+    // のような表示崩れが発生する。バージョンが一致しない場合は自動的に最新のSEEDへ差し替える。
+    // ※本番でサーバ同期(fetch('/api/patients'))に置き換えた際は、このバージョン差し替えロジックは
+    //   「サーバから取得できなかった場合のみ再シードする」形に見直すこと。
+    const PATIENT_MASTER_SCHEMA_VERSION = 'v2-2026-08-13';
+
     function fetchPatientMaster() {
       try {
+        const storedVersion = localStorage.getItem('vms_patient_master_version');
         const stored = localStorage.getItem('vms_patient_master');
-        if (stored) return JSON.parse(stored);
+        if (stored && storedVersion === PATIENT_MASTER_SCHEMA_VERSION) {
+          return JSON.parse(stored);
+        }
       } catch (e) {}
+      // 未初期化、または古いスキーマのキャッシュが残っている場合は最新のSEEDで必ず上書きする
       try {
         localStorage.setItem('vms_patient_master', JSON.stringify(SEED_PATIENT_MASTER));
+        localStorage.setItem('vms_patient_master_version', PATIENT_MASTER_SCHEMA_VERSION);
       } catch (e) {}
       return SEED_PATIENT_MASTER;
     }
@@ -3340,28 +3358,28 @@ var qrcode = function() {
     }
 
     function generateVisitId() {
+      // 受付番号はQRコードが読み取れなかった場合の手入力バックアップ用途のため、
+      // できるだけ短く・打ち込みやすくする。
+      // 「YYMMDD + 当日の連番3桁」だけで一意性は十分（vms_daily_seq が日付ごとに
+      // 連番管理しているため、時刻・ミリ秒・ランダム文字列を足す必要はない）。
       const now = new Date();
-      const today = now.toISOString().split('T')[0].replace(/-/g, '');
-      const time = now.toTimeString().split(' ')[0].replace(/:/g, '');
-      const ms = now.getMilliseconds().toString().padStart(3, '0');
-      const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
-      let seqData = { date: today, seq: 0 };
+      const y = String(now.getFullYear()).slice(2);
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      const today = `${y}${m}${d}`;
+      let seq = 1;
       try {
         const stored = localStorage.getItem('vms_daily_seq');
         if (stored) {
           const parsed = JSON.parse(stored);
-          seqData.seq = (parsed.date === today ? parsed.seq : 0) + 1;
-          seqData.date = today;
-        } else {
-          seqData.seq = 1;
-          seqData.date = today;
+          seq = (parsed.date === today ? parsed.seq : 0) + 1;
         }
-        localStorage.setItem('vms_daily_seq', JSON.stringify(seqData));
+        localStorage.setItem('vms_daily_seq', JSON.stringify({ date: today, seq: seq }));
       } catch (e) {
-        seqData.seq = 1;
+        seq = 1;
       }
-      // 日付_時刻ミリ秒_シーケンス_ランダム文字列
-      return `V${today}_${time}${ms}_${String(seqData.seq).padStart(3, '0')}_${rand}`;
+      // 例：V260813-004（11文字）
+      return `V${today}-${String(seq).padStart(3, '0')}`;
     }
 
     function searchPatientsByLastName(roomNo, kana) {
