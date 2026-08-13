@@ -13639,8 +13639,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         return;
       }
 
-      // 部屋の奥にあるカメラより、面会証を見せやすい背面/外向きカメラを優先（無ければ既定のカメラが使われる）
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      // キオスク端末は内蔵（正面向き）カメラを利用する想定のため、内カメラを優先する
+      // （無ければ既定のカメラが使われる）
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
         .then(stream => {
           checkoutCameraStream = stream;
           video.srcObject = stream;
