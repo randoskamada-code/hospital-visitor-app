@@ -147,7 +147,17 @@
       }
       #visit-pass #pass-qr { display: block !important; text-align: center; }
       #visit-pass #pass-qr svg { width: 18mm; height: 18mm; }
-      #visit-pass .pass-id { font-size: 6.5pt; font-weight: 600; text-align: center; margin-top: 1mm; word-break: break-all; line-height: 1.3; }
+      /* 【受付番号が小さすぎる問題の修正】以前は「受付番号: 260813427」を1行の文字列として
+         6.5ptという非常に小さいフォントに収めていた（QR横の列が幅20mmしかないため）。
+         ラベルと番号を別要素にして、印刷時だけラベルを小さく上段に、番号を大きく下段に
+         分けて表示することで、番号自体はほぼ2倍のサイズで読みやすくできる。 */
+      #visit-pass .pass-id { margin-top: 1mm; text-align: center; line-height: 1.25; }
+      #visit-pass .pass-id .pass-id-label { display: block; font-size: 5.5pt; font-weight: 600; color: #333; }
+      #visit-pass .pass-id .pass-id-sep { display: none; } /* 印刷ではラベルと番号を改行して分けるため「: 」は不要 */
+      /* 9桁を1行に収めようとすると幅20mmの列では小さくせざるを得ないため、
+         日付部分(6桁)と下3桁を別スパンにして、印刷時は2行に分けて表示する。
+         各行が短くなる分、1行のときよりずっと大きい文字サイズにできる。 */
+      #visit-pass .pass-id .pass-id-value { display: block; font-size: 14pt; font-weight: 700; letter-spacing: 0.3mm; }
       .no-print { display: none !important; }
       @page { size: 90mm 60mm; margin: 0; }
     }
@@ -4043,8 +4053,16 @@ var qrcode = function() {
       qrContainer.innerHTML = '';
       renderVisitQRCode(qrContainer, visitId);
 
-      // 受付番号（QRコードのフォールバック表示・手入力用）
-      document.getElementById('pass-id').textContent = `受付番号: ${visitId}`;
+      // 受付番号（QRコードのフォールバック表示・手入力用）。
+      // ラベルと番号を別要素にしておくことで、印刷時にラベルは小さく・番号は大きく
+      // 表示し分けられる（詳細は @media print 内の .pass-id 関連CSSを参照）。
+      // 区切りの「: 」も別spanにしておく（CSSの ::after 生成コンテンツに頼ると
+      // innerText() 取得時の挙動がブラウザ依存になり得るため、実テキストとして持たせる）。
+      // 番号本体は日付部分(6桁)と下3桁で別spanに分け、印刷時だけ2行に分けて大きく表示する
+      // （画面表示・innerText() で見える文字列自体は変わらず "260813427" のまま連結される）。
+      document.getElementById('pass-id').innerHTML =
+        `<span class="pass-id-label">受付番号</span><span class="pass-id-sep">: </span>` +
+        `<span class="pass-id-value">${visitId.slice(0, 6)}</span><span class="pass-id-value">${visitId.slice(6)}</span>`;
 
       // 完了画面の表示タイミングで面会ログを確定保存する（印刷するかどうかに関わらず必須）。
       // 以前は印刷ボタン押下時のみ保存しており、印刷しなかった来客は退館時にスキャンしても
@@ -4112,12 +4130,17 @@ var qrcode = function() {
       document.getElementById('checkout-scan-view').style.display = 'none';
       document.getElementById('checkout-manual-view').style.display = 'none';
 
+      // 【表記の分かりやすさ改善】ここで表示する氏名は「面会先の患者様」の氏名であり、
+      // 退館（面会を終えて建物を出る）するのは面会者本人。名前だけを大きく表示すると
+      // まるでその患者様ご本人が退館（退院）するかのように見えてしまうため、
+      // 「面会者の退館手続き」であることと「面会先の患者様」というラベルを明記する。
       resultDiv.innerHTML = `
         <div style="background-color: #FFF8E1; padding: 20px; border-radius: var(--radius); margin: 20px 0; border: 2px solid #F5A623;">
-          <div style="font-size: var(--fs-sm); margin-bottom: 10px; font-weight: 600;">この方の退館手続きを行います</div>
-          <div style="font-size: var(--fs-md); margin: 10px 0; font-weight: 700;">${patientName} 様</div>
+          <div style="font-size: var(--fs-sm); margin-bottom: 10px; font-weight: 600;">面会者様の退館手続きを行います</div>
+          <div style="font-size: var(--fs-xs); margin-top: 10px; color: var(--color-text-sub);">面会先の患者様</div>
+          <div style="font-size: var(--fs-md); margin: 4px 0 10px; font-weight: 700;">${patientName} 様</div>
           <div style="font-size: var(--fs-sm); margin: 10px 0;">お部屋: ${entry.roomNo}号室</div>
-          <div style="font-size: var(--fs-md); margin-top: 15px; font-weight: 600;">お名前・お部屋番号に間違いありませんか？</div>
+          <div style="font-size: var(--fs-md); margin-top: 15px; font-weight: 600;">面会先の患者様・お部屋番号に間違いありませんか？</div>
         </div>
         <div style="display: flex; gap: var(--gap); justify-content: center; flex-wrap: wrap;">
           <button class="btn-large" style="background-color: white; color: var(--color-primary);" onclick="showCheckoutManualEntry()">いいえ、番号を確認する</button>
@@ -4173,10 +4196,13 @@ var qrcode = function() {
       document.getElementById('checkout-scan-view').style.display = 'none';
       document.getElementById('checkout-manual-view').style.display = 'none';
 
+      // 【表記の分かりやすさ改善】「患者様: 山田太郎」だけだと、山田太郎様ご本人が
+      // 退館（退院）するように読めてしまう。ここで表示しているのは「面会先の患者様」
+      // であり、実際に退館するのは面会者である旨が伝わるよう明記する。
       resultDiv.innerHTML = `
         <div style="background-color: var(--color-primary-light); padding: 20px; border-radius: var(--radius); margin: 20px 0; border: 2px solid var(--color-primary);">
-          <div style="font-size: var(--fs-md); margin-bottom: 10px; font-weight: 700;">退館手続き完了</div>
-          <div style="font-size: var(--fs-sm); margin: 10px 0;">患者様: ${patientName}</div>
+          <div style="font-size: var(--fs-md); margin-bottom: 10px; font-weight: 700;">面会者様の退館手続き完了</div>
+          <div style="font-size: var(--fs-sm); margin: 10px 0;">面会先の患者様: ${patientName}</div>
           <div style="font-size: var(--fs-sm); margin: 10px 0;">お部屋: ${entry.roomNo}号室</div>
           <div style="font-size: var(--fs-sm); margin: 10px 0; color: var(--color-text-sub);">入館時刻: ${entry.displayTime}</div>
           <div style="font-size: var(--fs-sm); margin: 10px 0; color: var(--color-text-sub);">退館時刻: ${entry.checkoutTime}</div>
