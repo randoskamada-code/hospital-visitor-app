@@ -165,6 +165,37 @@
     textarea { font-size: var(--fs-md); padding: 12px; border: var(--border-w) solid var(--color-border); border-radius: var(--radius); font-family: inherit; }
     .help-text { font-size: var(--fs-xs); color: var(--color-text-sub); margin-top: 5px; margin-bottom: 10px; text-align: center; }
     .warning-icon { font-size: 80px; margin: 10px 0; }
+    /* 退館手続き：QRスキャン優先ビュー */
+    #checkout-scan-view { display: flex; flex-direction: column; align-items: center; }
+    .checkout-scan-frame { width: 220px; height: 220px; border: var(--border-w) solid var(--color-primary); border-radius: var(--radius); background-color: var(--color-primary-light); display: flex; align-items: center; justify-content: center; margin-bottom: 25px; }
+    .checkout-scan-icon { width: 130px; height: 130px; color: var(--color-primary); }
+    .checkout-scan-title { font-size: var(--fs-md); font-weight: 700; text-align: center; line-height: 1.5; margin-bottom: 10px; }
+    .checkout-scan-sub { font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 30px; }
+    /* スキャナーはキーボード入力を送出するので、この input は非表示のままフォーカスだけ保持する
+       （display:none/visibility:hiddenだとフォーカスできずスキャナー入力を受け取れないため、
+       サイズと不透明度だけを0にする） */
+    .checkout-hidden-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; opacity: 0; border: none; }
+    .checkout-manual-link { background: none; border: none; color: var(--color-text-sub); text-decoration: underline; font-size: var(--fs-xs); font-weight: 600; padding: 12px; cursor: pointer; }
+    #checkout-manual-view { display: flex; }
+    #checkout-manual-display { max-width: 500px; letter-spacing: 6px; }
+    /*
+      管理画面（訪問者ダッシュボード）専用のタイポグラフィ。
+      これまで表全体の文字サイズが患者向けタッチ画面用の --fs-xs（20px）を流用しており、
+      狭い列幅に対して文字が大きすぎるため各セルが折り返して行が縦に間延びしていた。
+      管理画面はスタッフ向けの通常デスクトップ密度の表なので、専用の小さめサイズで組む。
+    */
+    .admin-filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; align-items: center; }
+    .admin-filter-input { padding: 7px 10px; font-size: 13px; border: 1px solid var(--color-border); border-radius: 6px; font-family: inherit; }
+    .admin-filter-search-btn { padding: 7px 16px; font-size: 13px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .admin-table-wrap { overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
+    .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; background-color: white; line-height: 1.4; }
+    .admin-table thead tr { background-color: var(--color-primary-light); border-bottom: 2px solid var(--color-border); }
+    .admin-table th { padding: 8px 10px; text-align: left; border-right: 1px solid #ddd; font-size: 12px; font-weight: 700; position: sticky; top: 0; background-color: var(--color-primary-light); white-space: nowrap; }
+    .admin-table td { padding: 6px 10px; border-right: 1px solid #eee; vertical-align: middle; }
+    .admin-table tbody tr { border-bottom: 1px solid #eee; }
+    .admin-table tbody tr:nth-child(even) { background-color: #FAFAFA; }
+    .admin-table tbody tr:hover { background-color: var(--color-primary-light); }
+    .admin-table .col-nowrap, .admin-table td.col-nowrap { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -251,15 +282,41 @@
       <!-- チェックアウト画面 -->
       <section class="screen" id="screen-checkout">
         <button class="back-button" onclick="goTop()">← 最初に戻る</button>
-        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">退館手続き</div>
+        <div style="text-align: center; width: 100%; margin-bottom: 20px; font-size: var(--fs-md); font-weight: 600;">退館手続き</div>
         <div class="screen-content">
-          <div style="font-size: var(--fs-sm); margin-bottom: 30px; text-align: center;">
-            <div style="margin-bottom: 20px;">面会証のQRコードをスキャンするか、</div>
-            <div>受付番号を入力してください</div>
+
+          <!-- QRスキャン待機ビュー（デフォルト表示。スキャナーはキーボード入力として
+               文字を送出するため、非表示だがフォーカスされた checkout-input が受け取る） -->
+          <div id="checkout-scan-view">
+            <div class="checkout-scan-frame">
+              <svg viewBox="0 0 100 100" class="checkout-scan-icon" aria-hidden="true">
+                <path d="M8 28 V12 a4 4 0 0 1 4 -4 H28" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+                <path d="M72 8 H88 a4 4 0 0 1 4 4 V28" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+                <path d="M92 72 V88 a4 4 0 0 1 -4 4 H72" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+                <path d="M28 92 H12 a4 4 0 0 1 -4 -4 V72" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+                <rect x="34" y="34" width="32" height="32" rx="2" fill="none" stroke="currentColor" stroke-width="5"/>
+              </svg>
+            </div>
+            <div class="checkout-scan-title">面会証のQRコードを<br>スキャナーにかざしてください</div>
+            <div class="checkout-scan-sub">自動で読み取られます</div>
+            <input type="text" id="checkout-input" class="checkout-hidden-input" autocomplete="off" onkeypress="if(event.key==='Enter') submitCheckout()">
+            <button class="checkout-manual-link" onclick="showCheckoutManualEntry()">QRコードが読み取れない・面会証を紛失した場合はこちら</button>
           </div>
-          <input type="text" id="checkout-input" style="width: 80%; padding: 16px; font-size: var(--fs-md); border: var(--border-w) solid var(--color-border); border-radius: var(--radius); font-family: inherit; text-align: center; letter-spacing: 2px; margin-bottom: 20px;" placeholder="受付番号を入力" autocomplete="off" onkeypress="if(event.key==='Enter') submitCheckout()">
-          <div id="checkout-result" style="margin: 20px 0; width: 90%; text-align: center;"></div>
-          <button class="btn-large" onclick="submitCheckout()">確認</button>
+
+          <!-- 手入力ビュー（フォールバック。他の画面と同じテンキーで、ソフトキーボードは出さない） -->
+          <div id="checkout-manual-view" style="display: none; width: 100%; align-items: center; flex-direction: column;">
+            <div style="text-align: center; font-size: var(--fs-sm); font-weight: 600; margin-bottom: 15px;">受付番号（9桁）を入力してください</div>
+            <div class="input-display" id="checkout-manual-display">-</div>
+            <div class="numpad-container" id="numpad-checkout"></div>
+            <div style="display: flex; gap: var(--gap); margin-top: 15px;">
+              <button class="btn-large" onclick="clearCheckoutManualInput()">訂正</button>
+              <button class="btn-large" onclick="backspaceCheckoutManualInput()">←</button>
+              <button class="btn-large" id="checkout-manual-submit-btn" onclick="submitCheckoutManual()" disabled>確認</button>
+            </div>
+            <button class="checkout-manual-link" onclick="showCheckoutScanView()">← QRスキャンに戻る</button>
+          </div>
+
+          <div id="checkout-result" style="margin: 15px 0; width: 90%; text-align: center;"></div>
         </div>
       </section>
 
@@ -434,8 +491,8 @@
           <div style="text-align: center; margin-bottom: 20px; font-size: var(--fs-md); font-weight: 600;">訪問者管理ダッシュボード</div>
 
           <!-- 検索・フィルター -->
-          <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center;">
-            <select id="admin-filter-floor" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px;">
+          <div class="admin-filter-bar">
+            <select id="admin-filter-floor" class="admin-filter-input">
               <option value="">全フロア</option>
               <option value="3">3階</option>
               <option value="4">4階</option>
@@ -443,26 +500,26 @@
               <option value="6">6階</option>
               <option value="7">7階</option>
             </select>
-            <input type="text" id="admin-filter-room" placeholder="部屋番号" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px; width: 100px;">
-            <input type="date" id="admin-filter-date" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px;">
-            <input type="text" id="admin-filter-patient" placeholder="患者氏名" style="padding: 8px; font-size: var(--fs-xs); border: 1px solid var(--color-border); border-radius: 6px; width: 120px;">
-            <button onclick="applyAdminFilters()" style="padding: 8px 16px; font-size: var(--fs-xs); background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">検索</button>
+            <input type="text" id="admin-filter-room" placeholder="部屋番号" class="admin-filter-input" style="width: 90px;">
+            <input type="date" id="admin-filter-date" class="admin-filter-input">
+            <input type="text" id="admin-filter-patient" placeholder="患者氏名" class="admin-filter-input" style="width: 110px;">
+            <button onclick="applyAdminFilters()" class="admin-filter-search-btn">検索</button>
           </div>
 
           <!-- 訪問記録テーブル -->
-          <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; font-size: var(--fs-xs); background-color: white;">
+          <div class="admin-table-wrap">
+            <table class="admin-table">
               <thead>
-                <tr style="background-color: var(--color-primary-light); border-bottom: 2px solid var(--color-border);">
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">受付番号</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">患者氏名</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">患者部屋</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">面会者署名</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">関係</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">人数</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">入館時間</th>
-                  <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">退館時間</th>
-                  <th style="padding: 10px; text-align: left;">状態</th>
+                <tr>
+                  <th class="col-nowrap">受付番号</th>
+                  <th>患者氏名</th>
+                  <th class="col-nowrap">患者部屋</th>
+                  <th class="col-nowrap">面会者署名</th>
+                  <th>関係</th>
+                  <th class="col-nowrap">人数</th>
+                  <th class="col-nowrap">入館時間</th>
+                  <th class="col-nowrap">退館時間</th>
+                  <th class="col-nowrap">状態</th>
                 </tr>
               </thead>
               <tbody id="admin-table-body">
@@ -2903,8 +2960,11 @@ var qrcode = function() {
         } else if (screenId === 'screen-top') {
           resetAppState();
         } else if (screenId === 'screen-checkout') {
-          // チェックアウト画面：スキャナー入力にフォーカス
-          setTimeout(() => document.getElementById('checkout-input').focus(), 100);
+          // チェックアウト画面：QRスキャン優先ビューに戻し、スキャナー入力用の隠しinputへフォーカス
+          AppState.inputBuffer = '';
+          document.getElementById('checkout-result').innerHTML = '';
+          document.getElementById('checkout-input').value = '';
+          showCheckoutScanView();
         } else if (screenId === 'screen-room') {
           // 戻ってきた場合は roomNo を保持、新規の場合のみクリア
           if (!AppState.roomNo) AppState.inputBuffer = '';
@@ -2932,7 +2992,7 @@ var qrcode = function() {
           });
         }
         updateInputDisplay();
-        if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete' && screenId !== 'screen-checkout') startIdleTimer();
+        if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete') startIdleTimer();
         else if (screenId === 'screen-blocked') startBlockedTimer();
         else if (screenId === 'screen-complete') startCompleteTimer();
       }
@@ -3076,6 +3136,28 @@ var qrcode = function() {
       return '不明';
     }
 
+    function buildAdminRow(entry, master) {
+      const patientName = resolvePatientDisplayName(entry, master);
+      const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
+      const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
+
+      return `
+        <tr>
+          <td class="col-nowrap">${entry.visitId}</td>
+          <td>${patientName}</td>
+          <td class="col-nowrap">${entry.roomNo}号室</td>
+          <td class="col-nowrap" style="text-align: center;">
+            <button onclick="showSignature('${entry.visitId}')" style="padding: 3px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
+          </td>
+          <td>${entry.relation}</td>
+          <td class="col-nowrap">${entry.visitorCount}名</td>
+          <td class="col-nowrap">${entry.displayTime}</td>
+          <td class="col-nowrap">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
+          <td class="col-nowrap" style="background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
+        </tr>
+      `;
+    }
+
     function loadAdminDashboard() {
       console.log('loadAdminDashboard が呼ばれました');
       const log = getVisitLog();
@@ -3091,34 +3173,12 @@ var qrcode = function() {
       }
 
       if (log.length === 0) {
-        tbody.innerHTML = '<tr style="border-bottom: 1px solid #ddd;"><td colspan="8" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
         console.log('テーブルが更新されました（データなし）');
         return;
       }
 
-      tbody.innerHTML = log.map((entry, idx) => {
-        const patientName = resolvePatientDisplayName(entry, master);
-
-        const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
-        const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
-        const visitorName = entry.visitorSignature ? '署名あり' : '署名なし';
-
-        return `
-          <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitId}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${patientName}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.roomNo}号室</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd; text-align: center;">
-              <button onclick="showSignature('${entry.visitId}')" style="padding: 4px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
-            </td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.relation}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitorCount}名</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.displayTime}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
-            <td style="padding: 8px; background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
-          </tr>
-        `;
-      }).join('');
+      tbody.innerHTML = log.map(entry => buildAdminRow(entry, master)).join('');
 
       console.log('テーブルが更新されました（データあり）');
     }
@@ -3150,33 +3210,12 @@ var qrcode = function() {
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr style="border-bottom: 1px solid #ddd;"><td colspan="8" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
         return;
       }
 
-      tbody.innerHTML = filtered.map((entry, idx) => {
-        const patientName = resolvePatientDisplayName(entry, master);
-        const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
-        const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
-
-        return `
-          <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitId}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${patientName}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.roomNo}号室</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd; text-align: center;">
-              <button onclick="showSignature('${entry.visitId}')" style="padding: 4px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">表示</button>
-            </td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.relation}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.visitorCount}名</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.displayTime}</td>
-            <td style="padding: 8px; border-right: 1px solid #ddd;">${entry.checkoutTime ? entry.checkoutTime : '-'}</td>
-            <td style="padding: 8px; background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
-          </tr>
-        `;
-      }).join('');
+      tbody.innerHTML = filtered.map(entry => buildAdminRow(entry, master)).join('');
     }
-
     function showSignature(visitId) {
       const log = getVisitLog();
       const entry = log.find(e => e.visitId === visitId);
@@ -3227,6 +3266,8 @@ var qrcode = function() {
           if (AppState.inputBuffer.length < 3) AppState.inputBuffer += char;
         } else if (cur === 'screen-phone' || cur === 'screen-repeat-phone') {
           if (AppState.inputBuffer.length < 11) AppState.inputBuffer += char;
+        } else if (cur === 'screen-checkout') {
+          if (AppState.inputBuffer.length < 9) AppState.inputBuffer += char;
         } else if (cur === 'screen-kana') {
           if (AppState.kanaBuffer.length < 6) AppState.kanaBuffer += char;
         }
@@ -3256,7 +3297,42 @@ var qrcode = function() {
       } else if (AppState.currentScreen === 'screen-repeat-phone') {
         document.getElementById('repeat-phone-display').textContent = formatPhoneDisplay(AppState.inputBuffer) || '-';
         document.getElementById('repeat-phone-submit-btn').disabled = !validatePhone(AppState.inputBuffer);
+      } else if (AppState.currentScreen === 'screen-checkout') {
+        const display = document.getElementById('checkout-manual-display');
+        const btn = document.getElementById('checkout-manual-submit-btn');
+        if (display) display.textContent = AppState.inputBuffer || '-';
+        if (btn) btn.disabled = AppState.inputBuffer.length !== 9;
       }
+    }
+
+    function showCheckoutScanView() {
+      AppState.inputBuffer = '';
+      document.getElementById('checkout-result').innerHTML = '';
+      document.getElementById('checkout-scan-view').style.display = 'flex';
+      document.getElementById('checkout-manual-view').style.display = 'none';
+      updateInputDisplay();
+      // スキャナーの入力を受け取れるよう、非表示inputへフォーカスする
+      const input = document.getElementById('checkout-input');
+      input.value = '';
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function showCheckoutManualEntry() {
+      AppState.inputBuffer = '';
+      document.getElementById('checkout-result').innerHTML = '';
+      document.getElementById('checkout-scan-view').style.display = 'none';
+      document.getElementById('checkout-manual-view').style.display = 'flex';
+      updateInputDisplay();
+    }
+
+    function clearCheckoutManualInput() {
+      AppState.inputBuffer = '';
+      updateInputDisplay();
+    }
+
+    function backspaceCheckoutManualInput() {
+      AppState.inputBuffer = AppState.inputBuffer.slice(0, -1);
+      updateInputDisplay();
     }
 
     function normalizeKana(str) {
@@ -3309,6 +3385,15 @@ var qrcode = function() {
       }
     }
 
+    function notifyStorageFailure() {
+      // 【重要】以前は保存失敗時に console.error のみで、画面上は何のエラーも出ないまま
+      // 受付・退館が「完了しました」と表示されてしまい、実際には記録が保存されていない
+      // ことに誰も気付けない不具合があった（管理画面を開いても履歴が無いように見える）。
+      // 端末のブラウザ設定・ポリシーで localStorage が使えない環境もあり得るため、
+      // 保存に失敗した場合は必ずこの場で見える形（alert）で知らせる。
+      alert('⚠ この端末に記録を保存できませんでした。\nブラウザの設定（プライベートブラウズ／Cookie・サイトデータのブロック等）をご確認いただくか、システム担当者にご連絡ください。');
+    }
+
     function persistVisitLog(log) {
       // 面会ログ配列をそのまま localStorage に書き戻す（新規追加・既存レコード更新の両方で使う共通処理）
       try {
@@ -3316,6 +3401,7 @@ var qrcode = function() {
         return true;
       } catch (e) {
         console.error('localStorage 保存エラー:', e);
+        notifyStorageFailure();
         return false;
       }
     }
@@ -3331,7 +3417,8 @@ var qrcode = function() {
 
       if (!AppState.lastVisitRecord || !AppState.selectedPatient) {
         console.error('訪問記録の保存に必要な情報が不足しています');
-        return;
+        alert('⚠ 内部エラーにより記録を作成できませんでした。お手数ですが最初からやり直してください。');
+        return false;
       }
 
       const record = {
@@ -3352,16 +3439,21 @@ var qrcode = function() {
       };
 
       log.push(record);
-      if (persistVisitLog(log)) {
+      const saved = persistVisitLog(log);
+      if (saved) {
         console.log('✓ 訪問記録を保存しました:', record.visitId);
       }
+      return saved;
     }
 
     function generateVisitId() {
       // 受付番号はQRコードが読み取れなかった場合の手入力バックアップ用途のため、
       // できるだけ短く・打ち込みやすくする。
-      // 「YYMMDD + 当日の連番3桁」だけで一意性は十分（vms_daily_seq が日付ごとに
-      // 連番管理しているため、時刻・ミリ秒・ランダム文字列を足す必要はない）。
+      // 【数字のみにする理由】退館画面の手入力フォールバックは、他の画面と同じ
+      // テンキー（ソフトキーボードを出さない自前の数字ボタン）で入力させたい。
+      // "V"や"-"のような記号が混じると数字専用テンキーで入力できなくなるため、
+      // 「YYMMDD + 当日の連番3桁」の合計9桁の数字のみで構成する。
+      // 一意性は vms_daily_seq が日付ごとに連番管理しているため、これで十分。
       const now = new Date();
       const y = String(now.getFullYear()).slice(2);
       const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -3378,8 +3470,8 @@ var qrcode = function() {
       } catch (e) {
         seq = 1;
       }
-      // 例：V260813-004（11文字）
-      return `V${today}-${String(seq).padStart(3, '0')}`;
+      // 例：260813004（9桁の数字のみ）
+      return `${today}${String(seq).padStart(3, '0')}`;
     }
 
     function searchPatientsByLastName(roomNo, kana) {
@@ -3792,7 +3884,11 @@ var qrcode = function() {
       // 完了画面の表示タイミングで面会ログを確定保存する（印刷するかどうかに関わらず必須）。
       // 以前は印刷ボタン押下時のみ保存しており、印刷しなかった来客は退館時にスキャンしても
       // 「受付番号が見つかりません」となり、管理画面にも記録が残らない不具合があった。
-      saveVisitLog();
+      // 【重要】保存に失敗した場合は screen-complete に進ませない。保存できていないのに
+      // 「受付完了」と表示してしまうと、受付されたと思って帰ってしまい、記録も残らず、
+      // 退館時のスキャンも失敗するという最悪の状態になるため。
+      const saved = saveVisitLog();
+      if (!saved) return;
 
       showScreen('screen-complete');
     }
@@ -3802,10 +3898,24 @@ var qrcode = function() {
     }
 
     function submitCheckout() {
+      // QRスキャナー（またはEnterキー）からの送信
       const visitId = document.getElementById('checkout-input').value.trim();
+      processCheckoutId(visitId);
+    }
+
+    function submitCheckoutManual() {
+      // 手入力フォールバック（テンキー）からの送信
+      processCheckoutId(AppState.inputBuffer);
+    }
+
+    function processCheckoutId(visitId) {
       const log = getVisitLog();
       const entry = log.find(e => e.visitId === visitId);
       const resultDiv = document.getElementById('checkout-result');
+
+      if (!visitId) {
+        return;
+      }
 
       if (!entry) {
         resultDiv.innerHTML = `<div style="color: var(--color-alert); font-size: var(--fs-md); font-weight: 600; margin: 20px 0;">受付番号が見つかりません</div>`;
@@ -3826,7 +3936,12 @@ var qrcode = function() {
       // AppState（この時点では goTop() 済みで空）から「新規レコードを1件追加」する関数であり、
       // 既存レコードの更新（entry.checkoutTime の反映）には使えない。
       // 既存の log 配列（上で entry.checkoutTime を書き換え済み）をそのまま書き戻す。
-      persistVisitLog(log);
+      const saved = persistVisitLog(log);
+      if (!saved) {
+        // 保存に失敗した場合、画面には「完了」を絶対に表示しない（実際には退館記録が残っていないため）
+        resultDiv.innerHTML = `<div style="color: var(--color-alert); font-size: var(--fs-md); font-weight: 600; margin: 20px 0;">⚠ 保存に失敗しました。係員にお申し出ください。</div>`;
+        return;
+      }
 
       // 確認画面を表示
       const master = fetchPatientMaster();
@@ -3850,6 +3965,7 @@ var qrcode = function() {
       renderNumpad('numpad-room');
       renderNumpad('numpad-phone');
       renderNumpad('numpad-repeat-phone');
+      renderNumpad('numpad-checkout');
       renderKanaKeyboard();
 
       // SVG ノードにクリックイベントを設定
