@@ -359,10 +359,13 @@
       <section class="screen" id="screen-relation">
         <button class="back-button" onclick="goBack()">← 戻る</button>
         <div style="text-align: center; width: 100%; margin-bottom: 20px; font-size: var(--fs-md); font-weight: 600;">患者さまとのご関係をお選びください</div>
-        <!-- 画面を縦に「親等図（上2/3）」「その他続柄のリンク（下1/3）」の2段に分け、
-             下段のリンクが親等図のスクロール位置に関わらず常に見える・押せるようにした。 -->
-        <div class="screen-content" style="width: 100%; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
-          <div id="family-tree-scroll" style="flex: 2 1 0; min-height: 0; width: 100%; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+        <!-- 画面を横に「親等図（左2/3）」「その他続柄のリンク（右1/3）」の3分割で並べ、
+             右側のリンクが親等図のスクロール位置に関わらず常に見える・押せるようにした。 -->
+        <div class="screen-content" style="width: 100%; display: flex; flex-direction: row; align-items: stretch; overflow: hidden; padding: 0;">
+          <!-- align-items も justify-content と同様、コンテンツ（SVG）がコンテナ幅より広い場合に
+               center のままだと左側がスクロールで届かない領域になってしまうため flex-start にする。
+               横方向の見た目の中央寄せは resetFamilyTreeScroll() の scrollLeft 計算で行う。 -->
+          <div id="family-tree-scroll" style="flex: 2 1 0; min-width: 0; height: 100%; overflow: auto; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;">
             <!-- 親等図（コンパクト版）：
                  ・よく使う続柄（父母・兄弟姉妹・配偶者とその父母兄弟姉妹・子孫）だけを
                    常時表示のツリーにし、横スクロールなしで画面に収まるようにした。
@@ -435,12 +438,13 @@
               <text x="540" y="739" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">ひ孫</text>
             </svg>
           </div>
-          <div style="flex: 1 1 0; min-height: 0; width: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-top: 2px solid #eee; padding: 10px 0; box-sizing: border-box;">
+          <div style="flex: 1 1 0; min-width: 0; height: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; border-left: 2px solid #eee; padding: 10px 12px; box-sizing: border-box;">
             <div style="font-size: var(--fs-sm); color: #666;">その他のご関係</div>
-            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
-              <button class="checkout-manual-link" id="paternal-extended-link" onclick="showRelationDetail('父方のご親族', 'paternal-extended')">父方のご親族（祖父母・叔父叔母・いとこ）はこちら</button>
-              <button class="checkout-manual-link" id="maternal-extended-link" onclick="showRelationDetail('母方のご親族', 'maternal-extended')">母方のご親族（祖父母・叔父叔母・いとこ）はこちら</button>
-              <button class="checkout-manual-link" id="guardian-link" onclick="showRelationDetail('後見人・その他', 'guardian')">ご家族・ご親族以外の方（後見人など）はこちら</button>
+            <!-- 右側の列は幅が狭いため、ボタンは横並びではなく縦に積む。文字は折り返し可（white-space:normal）。 -->
+            <div style="display: flex; flex-direction: column; align-items: stretch; gap: 12px; width: 100%;">
+              <button class="checkout-manual-link" id="paternal-extended-link" onclick="showRelationDetail('父方のご親族', 'paternal-extended')" style="white-space: normal;">父方のご親族（祖父母・叔父叔母・いとこ）はこちら</button>
+              <button class="checkout-manual-link" id="maternal-extended-link" onclick="showRelationDetail('母方のご親族', 'maternal-extended')" style="white-space: normal;">母方のご親族（祖父母・叔父叔母・いとこ）はこちら</button>
+              <button class="checkout-manual-link" id="guardian-link" onclick="showRelationDetail('後見人・その他', 'guardian')" style="white-space: normal;">ご家族・ご親族以外の方（後見人など）はこちら</button>
             </div>
           </div>
         </div>
