@@ -230,7 +230,7 @@
           <!-- 左側：面会フロー -->
           <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 3px solid var(--color-border); padding: 20px; background-color: #FAFAFA;">
             <h1 style="font-size: var(--fs-lg); margin-bottom: 40px; font-weight: 700;">面会</h1>
-            <button class="btn-jumbo" onclick="startNewFlow()" style="margin: 15px 0; width: 85%;"><div style="text-align: center;"><div style="font-size: var(--fs-sm); margin-bottom: 10px;">初めて（または久しぶり）</div><div style="font-size: var(--fs-xs); color: var(--color-text-sub);">新規登録</div></div></button>
+            <button class="btn-jumbo" onclick="startNewFlow()" style="margin: 15px 0; width: 85%;"><div style="text-align: center;"><div style="font-size: var(--fs-sm);">初めての面会</div></div></button>
             <button class="btn-jumbo" onclick="startRepeatFlow()" style="margin: 15px 0; width: 85%;"><div style="text-align: center;"><div style="font-size: var(--fs-sm); margin-bottom: 10px;">2回目以降</div><div style="font-size: var(--fs-xs); color: var(--color-text-sub);">電話番号で受付</div></div></button>
           </div>
 
@@ -349,7 +349,7 @@
 
       <section class="screen" id="screen-sign">
         <button class="back-button" onclick="goBack()">← 戻る</button>
-        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">面会される方のお名前をご記入ください</div>
+        <div style="text-align: center; width: 100%; margin-bottom: 30px; font-size: var(--fs-md); font-weight: 600;">面会される方のお名前を（フルネームで）ご記入ください</div>
         <div class="screen-content">
           <canvas id="signature-canvas"></canvas>
           <div class="two-button-row">
@@ -501,7 +501,7 @@
       </section>
       <section class="screen" id="screen-phone">
         <button class="back-button" onclick="goBack()">← 戻る</button>
-        <div style="text-align: center; width: 100%; margin-bottom: 15px; font-size: var(--fs-sm); font-weight: 600;">お電話番号をご入力ください</div>
+        <div style="text-align: center; width: 100%; margin-bottom: 15px; font-size: var(--fs-sm); font-weight: 600;">携帯電話またはご自宅のお電話番号をご入力ください</div>
         <div class="screen-content" style="flex: 1; justify-content: flex-start; padding-top: 0;">
           <div style="font-size: var(--fs-xs); color: var(--color-text-sub); margin-bottom: 10px;">次回から受付が早くなります</div>
           <div class="input-display" id="phone-display" style="font-size: var(--fs-lg); margin-bottom: 8px;">-</div>
@@ -513,7 +513,7 @@
       </section>
       <section class="screen" id="screen-repeat-phone">
         <button class="back-button" onclick="goBack()">← 戻る</button>
-        <div style="text-align: center; width: 100%; margin-bottom: 15px; font-size: var(--fs-sm); font-weight: 600;">お電話番号をご入力ください</div>
+        <div style="text-align: center; width: 100%; margin-bottom: 15px; font-size: var(--fs-sm); font-weight: 600;">携帯電話またはご自宅のお電話番号をご入力ください</div>
         <div class="screen-content" style="flex: 1; justify-content: flex-start; padding-top: 0;">
           <div style="font-size: var(--fs-xs); color: var(--color-text-sub); margin-bottom: 10px;">前回登録のお電話番号</div>
           <div class="input-display" id="repeat-phone-display" style="font-size: var(--fs-lg); margin-bottom: 8px;">-</div>
@@ -603,7 +603,7 @@
             <button onclick="downloadVisitLogBackup()" class="admin-backup-btn">💾 バックアップを保存</button>
           </div>
           <div style="text-align: center; font-size: 11px; color: var(--color-text-sub); margin-top: -10px; margin-bottom: 16px;">
-            この端末に保存されている面会履歴を、日時入りのファイル名でパソコンにダウンロードします（USBメモリ等への保管を推奨）。
+            この端末に保存されている面会履歴を、日時入りのファイル名でダウンロードします（保存先はブラウザの「ダウンロード」フォルダです。USBメモリへの保存はできません）。
           </div>
 
           <!-- 訪問記録テーブル -->
@@ -14010,7 +14010,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     // 管理画面の「💾 バックアップを保存」ボタン用。
     // 【目的】この端末（PC/タブレット）がフリーズ・故障した場合や、誤操作でデータが
     // 壊れてしまった場合に備え、管理者が任意のタイミングで面会履歴・患者マスタを
-    // ファイルとして手元（USBメモリ等）に保存できるようにする。
+    // ファイルとして書き出せるようにする。
+    // 【保存先について】ブラウザの標準ダウンロード機能（<a download>）を使っているため、
+    // 保存先はブラウザ側の設定に従う（Windows PCのEdge/Chromeでは通常「ダウンロード」
+    // フォルダ）。USBメモリへの保存は運用上禁止されているため、案内文言・想定運用からも
+    // USBメモリの記載は外している。iPad等タブレットのブラウザではダウンロード時の挙動が
+    // 異なる（保存先の選択や共有シートが出る、あるいはfile://上のBlobダウンロードが
+    // 期待通り動かない可能性がある）ため、iPadで管理画面を使う場合は事前に動作確認が必要。
     // 【現状の位置づけ】これは「取り込み（復元）」機能とセットではなく、あくまで
     // 万一の際に開発担当者が中身（JSONテキスト）を見て手作業で復旧するための保険。
     // オフライン単一HTMLアプリのため、サーバー等へは一切送信せず、この端末上で
@@ -14028,9 +14034,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     }
 
     // 【自動バックアップについて】以前はこの端末が使われた日に自動的にバックアップファイルを
-    // ダウンロードする仕組みを入れていたが、現時点ではまだ運用（USBメモリ等への保管や、
-    // 共有フォルダへの自動保存の仕組み）が定まっておらず、無駄なファイルが増えるだけになるため
-    // 廃止した。バックアップが必要な時は管理画面の「💾 バックアップを保存」ボタンで手動で行う。
+    // ダウンロードする仕組みを入れていたが、現時点ではまだ運用（共有フォルダへの自動保存の
+    // 仕組み等。USBメモリは運用上使用禁止のため保存先の選択肢から除外）が定まっておらず、
+    // 無駄なファイルが増えるだけになるため廃止した。バックアップが必要な時は管理画面の
+    // 「💾 バックアップを保存」ボタンで手動で行う。
     // 【今後、自動化する場合の設計メモ】日付入りのファイル名で毎日書き出す方式は、続ける
     // ほどファイル数が際限なく増えてしまう。かといって同じ1つのファイルに毎回上書きする方式では、
     // 数日前の状態には戻れず、壊れたデータに気づく前に上書きされてしまうと手遅れになる。
@@ -14675,8 +14682,38 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           AppState.relation = rec.relation;
           AppState.relationOther = rec.relationOther;
           AppState.entryType = 'repeat';
+          // 【バグ修正】以前はここで screen-repeat-confirm に進むだけで中身を何も描画しておらず、
+          // 電話番号を入れた直後の画面が空欄に見えるという不具合があった。
+          // 患者情報（部屋番号・姓のみ／プライバシー配慮でフルネームは出さない）・
+          // 前回のご関係・前回の署名を表示し、「このまま進む／書き直す」を判断できるようにする。
+          renderRepeatConfirm(rec, patient);
           showScreen('screen-repeat-confirm');
         }
+      }
+    }
+
+    function renderRepeatConfirm(rec, patient) {
+      const content = document.getElementById('repeat-confirm-content');
+      const sigHtml = AppState.signatureData
+        ? `<div style="margin-top: 15px;">
+             <div style="font-size: var(--fs-xs); color: var(--color-text-sub); margin-bottom: 5px;">前回のご署名</div>
+             <img src="${AppState.signatureData}" style="max-width: 100%; max-height: 120px; border: 2px solid var(--color-border); border-radius: 8px; background: white;">
+           </div>`
+        : '';
+      content.innerHTML = `
+        <div class="confirm-room">${patient.roomNo} 号室</div>
+        <div class="confirm-name">${patient.lastNameKanji}　様</div>
+        <div style="font-size: var(--fs-sm); margin-top: 10px;">ご関係：${formatRelationLabel(AppState.relation, AppState.relationOther)}</div>
+        ${sigHtml}
+      `;
+
+      // 前回記録時の部屋番号と、患者マスタ上の現在の部屋番号が異なる場合
+      // （入院中に転室していた場合など）は、お部屋の間違いに気づけるよう注意書きを出す。
+      const noteEl = document.getElementById('repeat-transfer-note');
+      if (rec.roomNo && patient.roomNo && rec.roomNo !== patient.roomNo) {
+        noteEl.textContent = `※前回のご記録では${rec.roomNo}号室でしたが、現在は${patient.roomNo}号室です。お部屋が変わっている可能性がありますので、ご確認ください。`;
+      } else {
+        noteEl.textContent = '';
       }
     }
 
@@ -14754,7 +14791,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
       const master = fetchPatientMaster();
       const patient = master.find(p => p.patientId === entry.patientId);
-      const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji}` : '不明';
+      // 【プライバシー配慮】受付側（確認画面・受付票）ではフルネームを表示せず「姓＋様」のみに
+      // しているのに合わせ、退館手続き画面（周囲から画面が見える可能性がある）でも
+      // フルネームは表示せず姓のみにする。
+      const patientName = patient ? `${patient.lastNameKanji}` : '不明';
 
       // スクロールなしで確認内容が見えるよう、スキャン枠・手入力欄は非表示にする
       document.getElementById('checkout-scan-view').style.display = 'none';
@@ -14817,7 +14857,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       // 完了パネルを表示
       const master = fetchPatientMaster();
       const patient = master.find(p => p.patientId === entry.patientId);
-      const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji}` : '不明';
+      // 【プライバシー配慮】受付側（確認画面・受付票）ではフルネームを表示せず「姓＋様」のみに
+      // しているのに合わせ、退館手続き画面（周囲から画面が見える可能性がある）でも
+      // フルネームは表示せず姓のみにする。
+      const patientName = patient ? `${patient.lastNameKanji}` : '不明';
 
       // 【表示崩れの修正】以前はQRスキャン待ち受け表示（大きなアイコン枠）を残したまま
       // その下に完了メッセージを追加していたため、画面に収まりきらず「退館手続き完了」を
