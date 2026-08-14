@@ -186,10 +186,6 @@
     .checkout-scan-title { font-size: var(--fs-md); font-weight: 700; text-align: center; line-height: 1.5; margin-bottom: 10px; }
     .checkout-scan-sub { font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 30px; }
     .checkout-scan-sub.is-error { color: var(--color-alert); font-weight: 600; }
-    /* スキャナーはキーボード入力を送出するので、この input は非表示のままフォーカスだけ保持する
-       （display:none/visibility:hiddenだとフォーカスできずスキャナー入力を受け取れないため、
-       サイズと不透明度だけを0にする） */
-    .checkout-hidden-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; opacity: 0; border: none; }
     .checkout-manual-link { background: none; border: none; color: var(--color-text-sub); text-decoration: underline; font-size: var(--fs-xs); font-weight: 600; padding: 12px; cursor: pointer; }
     .checkout-camera-switch-btn { display: inline-flex; align-items: center; gap: 6px; background: white; border: 2px solid var(--color-primary); color: var(--color-primary); border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; padding: 8px 18px; cursor: pointer; margin-bottom: 15px; }
     #checkout-manual-view { display: flex; }
@@ -203,6 +199,7 @@
     .admin-filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; align-items: center; }
     .admin-filter-input { padding: 7px 10px; font-size: 13px; border: 1px solid var(--color-border); border-radius: 6px; font-family: inherit; }
     .admin-filter-search-btn { padding: 7px 16px; font-size: 13px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .admin-backup-btn { padding: 7px 16px; font-size: 13px; background-color: white; color: var(--color-primary); border: 2px solid var(--color-primary); border-radius: 6px; cursor: pointer; font-weight: 600; }
     .admin-table-wrap { overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
     .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; background-color: white; line-height: 1.4; }
     .admin-table thead tr { background-color: var(--color-primary-light); border-bottom: 2px solid var(--color-border); }
@@ -305,10 +302,7 @@
         <div style="text-align: center; width: 100%; margin-bottom: 20px; font-size: var(--fs-md); font-weight: 600;">退館手続き</div>
         <div class="screen-content">
 
-          <!-- QRスキャン待機ビュー（デフォルト表示）。
-               内蔵カメラの映像をリアルタイムに読み取ってQRコードを検出する。
-               外付けのバーコード/QRスキャナー機器（キーボード入力として文字を送出するタイプ）を
-               後から接続した場合にも動くよう、非表示だがフォーカスされた checkout-input も残してある。 -->
+          <!-- QRスキャン待機ビュー（デフォルト表示）。内蔵カメラの映像をリアルタイムに読み取ってQRコードを検出する。 -->
           <div id="checkout-scan-view">
             <div class="checkout-scan-frame">
               <video id="checkout-camera-video" class="checkout-camera-video" autoplay playsinline muted></video>
@@ -326,7 +320,6 @@
             <!-- 内蔵カメラが複数ある端末（内カメラ・外付けカメラ等）向けの切り替えボタン。
                  カメラが1台しか検出されない場合は自動的に非表示になる。 -->
             <button class="checkout-camera-switch-btn" id="checkout-camera-switch-btn" onclick="switchCheckoutCamera()" style="display: none;">🔄 カメラを切り替える</button>
-            <input type="text" id="checkout-input" class="checkout-hidden-input" autocomplete="off" onkeypress="if(event.key==='Enter') submitCheckout()">
             <button class="checkout-manual-link" onclick="showCheckoutManualEntry()">QRコードが読み取れない・面会証を紛失した場合はこちら</button>
           </div>
 
@@ -363,45 +356,55 @@
         <button class="back-button" onclick="goBack()">← 戻る</button>
         <div style="text-align: center; width: 100%; margin-bottom: 20px; font-size: var(--fs-md); font-weight: 600;">患者さまとのご関係をお選びください</div>
         <div class="screen-content" style="width: 100%; overflow: auto;">
-          <svg id="family-tree" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg" style="width: 100%; max-width: 1200px; height: auto; background: white; border: 1px solid #ddd; border-radius: 8px;">
-            <line x1="600" y1="80" x2="600" y2="130" stroke="#999" stroke-width="2"/>
-            <line x1="600" y1="130" x2="450" y2="180" stroke="#999" stroke-width="2"/>
-            <line x1="600" y1="130" x2="750" y2="180" stroke="#999" stroke-width="2"/>
-            <line x1="450" y1="240" x2="450" y2="280" stroke="#999" stroke-width="2"/>
-            <line x1="450" y1="280" x2="350" y2="350" stroke="#999" stroke-width="2"/>
-            <line x1="450" y1="280" x2="750" y2="350" stroke="#999" stroke-width="2"/>
-            <line x1="350" y1="350" x2="750" y2="350" stroke="#999" stroke-width="3"/>
-            <line x1="550" y1="350" x2="550" y2="420" stroke="#999" stroke-width="2"/>
-            <line x1="550" y1="420" x2="550" y2="500" stroke="#999" stroke-width="2"/>
-            <line x1="550" y1="560" x2="550" y2="620" stroke="#999" stroke-width="2"/>
-            <line x1="550" y1="680" x2="550" y2="740" stroke="#999" stroke-width="2"/>
+          <!-- 親等図：以前のバージョンは「叔父」が父の子であるかのような位置・線になっていた
+               （祖父母→父→叔父、という誤った縦の親子関係に見えてしまっていた）ため、
+               祖父母の実の子である「父」「叔父」を兄弟として横に並べ、母は父の配偶者として
+               横から接続する形に修正した。あわせて、文字が小さく読みにくいとの指摘を受け、
+               枠を一回り大きくし（160×50→200×70）、文字サイズも大きくした（20→28）。 -->
+          <svg id="family-tree" viewBox="0 0 1200 920" xmlns="http://www.w3.org/2000/svg" style="width: 100%; max-width: 1200px; height: auto; background: white; border: 1px solid #ddd; border-radius: 8px;">
+            <!-- 祖父母 → （叔父・父）の兄弟関係 -->
+            <line x1="600" y1="100" x2="600" y2="140" stroke="#999" stroke-width="3"/>
+            <line x1="190" y1="140" x2="450" y2="140" stroke="#999" stroke-width="3"/>
+            <line x1="190" y1="140" x2="190" y2="170" stroke="#999" stroke-width="3"/>
+            <line x1="450" y1="140" x2="450" y2="170" stroke="#999" stroke-width="3"/>
+            <!-- 父 ⚭ 母（夫婦） -->
+            <line x1="550" y1="205" x2="650" y2="205" stroke="#999" stroke-width="4"/>
+            <!-- 父・母の夫婦線の中央 → 患者 -->
+            <line x1="600" y1="205" x2="600" y2="240" stroke="#999" stroke-width="3"/>
+            <line x1="600" y1="240" x2="600" y2="340" stroke="#999" stroke-width="3"/>
+            <!-- 患者 ⚭ 配偶者（夫婦） -->
+            <line x1="700" y1="375" x2="800" y2="375" stroke="#999" stroke-width="4"/>
+            <!-- 患者・配偶者の夫婦線の中央 → 子・孫・ひ孫 -->
+            <line x1="750" y1="375" x2="750" y2="500" stroke="#999" stroke-width="3"/>
+            <line x1="750" y1="570" x2="750" y2="650" stroke="#999" stroke-width="3"/>
+            <line x1="750" y1="720" x2="750" y2="800" stroke="#999" stroke-width="3"/>
 
-            <rect id="gp-node" x="520" y="50" width="160" height="50" fill="#e8f0ff" stroke="#4A9B6F" stroke-width="2" rx="5" cursor="pointer"/>
-            <text x="600" y="82" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">祖父母</text>
+            <rect id="gp-node" x="500" y="30" width="200" height="70" fill="#e8f0ff" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
+            <text x="600" y="74" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">祖父母</text>
 
-            <rect id="father-node" x="370" y="180" width="160" height="50" fill="#fff0e8" stroke="#4A9B6F" stroke-width="2" rx="5" cursor="pointer"/>
-            <text x="450" y="212" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">父</text>
+            <rect id="uncle-node" x="90" y="170" width="200" height="70" fill="#f0f0e8" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
+            <text x="190" y="214" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">叔父</text>
 
-            <rect id="mother-node" x="670" y="180" width="160" height="50" fill="#ffe8f0" stroke="#4A9B6F" stroke-width="2" rx="5" cursor="pointer"/>
-            <text x="750" y="212" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">母</text>
+            <rect id="father-node" x="350" y="170" width="200" height="70" fill="#fff0e8" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
+            <text x="450" y="214" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">父</text>
 
-            <rect id="uncle-node" x="370" y="280" width="160" height="50" fill="#f0f0e8" stroke="#4A9B6F" stroke-width="2" rx="5" cursor="pointer"/>
-            <text x="450" y="312" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">叔父</text>
+            <rect id="mother-node" x="650" y="170" width="200" height="70" fill="#ffe8f0" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
+            <text x="750" y="214" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">母</text>
 
-            <rect id="patient-node" x="270" y="350" width="160" height="50" fill="#fff9e6" stroke="#4A9B6F" stroke-width="3" rx="5"/>
-            <text x="350" y="382" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">【患者】</text>
+            <rect id="patient-node" x="500" y="340" width="200" height="70" fill="#fff9e6" stroke="#4A9B6F" stroke-width="3" rx="10"/>
+            <text x="600" y="384" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">【患者】</text>
 
-            <rect id="spouse-node" x="670" y="350" width="160" height="50" fill="#e8f5e9" stroke="#4A9B6F" stroke-width="2" rx="5" cursor="pointer"/>
-            <text x="750" y="382" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">配偶者</text>
+            <rect id="spouse-node" x="800" y="340" width="200" height="70" fill="#e8f5e9" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
+            <text x="900" y="384" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">配偶者</text>
 
-            <rect id="child-node" x="470" y="500" width="160" height="50" fill="#e8eff5" stroke="#4A9B6F" stroke-width="2" rx="5" cursor="pointer"/>
-            <text x="550" y="532" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">子</text>
+            <rect id="child-node" x="650" y="500" width="200" height="70" fill="#e8eff5" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
+            <text x="750" y="544" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">子</text>
 
-            <rect id="grandchild-node" x="470" y="620" width="160" height="50" fill="#f0e8f5" stroke="#4A9B6F" stroke-width="2" rx="5" cursor="pointer"/>
-            <text x="550" y="652" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">孫</text>
+            <rect id="grandchild-node" x="650" y="650" width="200" height="70" fill="#f0e8f5" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
+            <text x="750" y="694" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">孫</text>
 
-            <rect id="ggchild-node" x="470" y="740" width="160" height="50" fill="#f5e8f0" stroke="#4A9B6F" stroke-width="2" rx="5" cursor="pointer"/>
-            <text x="550" y="772" text-anchor="middle" font-size="20" font-weight="bold" pointer-events="none">ひ孫</text>
+            <rect id="ggchild-node" x="650" y="800" width="200" height="70" fill="#f5e8f0" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
+            <text x="750" y="844" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">ひ孫</text>
           </svg>
         </div>
         <div id="relation-detail-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
@@ -531,6 +534,11 @@
             <input type="date" id="admin-filter-date" class="admin-filter-input">
             <input type="text" id="admin-filter-patient" placeholder="患者氏名" class="admin-filter-input" style="width: 110px;">
             <button onclick="applyAdminFilters()" class="admin-filter-search-btn">検索</button>
+            <button onclick="downloadVisitLogBackup()" class="admin-backup-btn">💾 バックアップを保存</button>
+          </div>
+          <div style="text-align: center; font-size: 11px; color: var(--color-text-sub); margin-top: -10px; margin-bottom: 16px;">
+            この端末に保存されている面会履歴を、日時入りのファイル名でパソコンにダウンロードします（USBメモリ等への保管を推奨）。<br>
+            自動バックアップ（1日1回・押し忘れ防止用）: 最終実施日 <span id="admin-auto-backup-status">-</span>
           </div>
 
           <!-- 訪問記録テーブル -->
@@ -13111,11 +13119,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         } else if (screenId === 'screen-top') {
           resetAppState();
         } else if (screenId === 'screen-checkout') {
-          // チェックアウト画面：QRスキャン優先ビューに戻し、スキャナー入力用の隠しinputへフォーカス
+          // チェックアウト画面：QRスキャン優先ビューに戻す
           AppState.inputBuffer = '';
           AppState.checkoutSucceeded = false;
           document.getElementById('checkout-result').innerHTML = '';
-          document.getElementById('checkout-input').value = '';
           showCheckoutScanView();
         } else if (screenId === 'screen-room') {
           // 戻ってきた場合は roomNo を保持、新規の場合のみクリア
@@ -13245,7 +13252,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     function startRepeatFlow() { AppState.mode = 'repeat'; AppState.entryType = 'repeat'; showScreen('screen-repeat-phone'); }
     function startCheckoutFlow() {
       AppState.mode = 'checkout';
-      document.getElementById('checkout-input').value = '';
       document.getElementById('checkout-result').innerHTML = '';
       showScreen('screen-checkout');
     }
@@ -13491,6 +13497,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     function loadAdminDashboard() {
       renderAdminTable();
+      const statusEl = document.getElementById('admin-auto-backup-status');
+      if (statusEl) statusEl.textContent = getLastAutoBackupDateLabel();
     }
 
     function applyAdminFilters() {
@@ -13591,11 +13599,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       document.getElementById('checkout-scan-view').style.display = 'flex';
       document.getElementById('checkout-manual-view').style.display = 'none';
       updateInputDisplay();
-      // 外付けスキャナー機器（キーボード入力として送出するタイプ）の入力も受け取れるよう、
-      // 非表示inputへフォーカスしておく（内蔵カメラでの読み取りと共存できる）
-      const input = document.getElementById('checkout-input');
-      input.value = '';
-      setTimeout(() => input.focus(), 50);
       startCheckoutCamera();
     }
 
@@ -13899,6 +13902,100 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       }
     }
 
+    // バックアップ用のJSON Blobとファイル名を組み立てる共通処理
+    // （手動の「💾 バックアップを保存」ボタンと、自動バックアップの両方から使う）。
+    function buildVisitLogBackupPayload() {
+      const log = getVisitLog();
+      const patientMaster = fetchPatientMaster();
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const backup = {
+        exportedAt: now.toISOString(),
+        appName: '病院受付システム',
+        note: 'vms_visit_log（面会履歴）と vms_patient_master（患者マスタ）の内容をそのまま書き出したバックアップです。このファイルからの自動復元機能は現時点ではありません。',
+        visitLog: log,
+        patientMaster: patientMaster
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      // 【ファイル名について】日本語ファイル名にしたいところだが、環境によっては
+      // download属性の非ASCII文字が正しく反映されず「download」という無名のファイルに
+      // なってしまうことがあるため、確実性を優先してASCII文字のみのファイル名にしている
+      // （中身のJSONは全て日本語のまま保存される）。
+      const filename = `visit_backup_${stamp}.json`;
+      return { blob, filename };
+    }
+
+    function triggerBlobDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // 管理画面の「💾 バックアップを保存」ボタン用。
+    // 【目的】この端末（PC/タブレット）がフリーズ・故障した場合や、誤操作でデータが
+    // 壊れてしまった場合に備え、管理者が任意のタイミングで面会履歴・患者マスタを
+    // ファイルとして手元（USBメモリ等）に保存できるようにする。
+    // 【現状の位置づけ】これは「取り込み（復元）」機能とセットではなく、あくまで
+    // 万一の際に開発担当者が中身（JSONテキスト）を見て手作業で復旧するための保険。
+    // オフライン単一HTMLアプリのため、サーバー等へは一切送信せず、この端末上で
+    // ファイルとして書き出すだけ。
+    function downloadVisitLogBackup() {
+      let payload;
+      try {
+        payload = buildVisitLogBackupPayload();
+      } catch (e) {
+        console.error('バックアップファイルの作成に失敗:', e);
+        alert('⚠ バックアップファイルの作成に失敗しました。');
+        return;
+      }
+      triggerBlobDownload(payload.blob, payload.filename);
+    }
+
+    // ============================================================
+    // 自動バックアップ（1日1回、ボタンを押さなくても自動的にバックアップを保存する）
+    // ============================================================
+    // 【背景】バックアップボタンの押し忘れ対策として、この端末が使われた日は
+    // 自動的に1回だけバックアップファイルをダウンロードするようにする。
+    // 「使われた日」を判定基準にしているのは、ページを開きっぱなしでも日付が
+    // 変わったタイミングでは自動的には走らないため、受付・退館などの操作の
+    // 直後にも同じチェックを行い、日付が変わっていれば取りこぼさないようにしている。
+    const AUTO_BACKUP_DATE_KEY = 'vms_last_auto_backup_date';
+
+    function todayDateString() {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    }
+
+    function maybeRunAutoBackup() {
+      try {
+        const today = todayDateString();
+        const lastDate = localStorage.getItem(AUTO_BACKUP_DATE_KEY);
+        if (lastDate === today) return; // 今日は既に自動バックアップ済み
+        const payload = buildVisitLogBackupPayload();
+        triggerBlobDownload(payload.blob, payload.filename);
+        localStorage.setItem(AUTO_BACKUP_DATE_KEY, today);
+        console.log('✓ 自動バックアップを実行しました:', payload.filename);
+      } catch (e) {
+        // 自動バックアップの失敗で受付・退館業務自体が止まってはいけないため、
+        // ここでは alert を出さず console.error のみに留める
+        // （手動バックアップの状況は管理画面の表示で確認できる）。
+        console.error('自動バックアップに失敗しました:', e);
+      }
+    }
+
+    // 管理画面に「自動バックアップ: 最終 YYYY-MM-DD」を表示するための取得用関数
+    function getLastAutoBackupDateLabel() {
+      const lastDate = localStorage.getItem(AUTO_BACKUP_DATE_KEY);
+      return lastDate ? lastDate : '未実施';
+    }
+
     function notifyStorageFailure() {
       // 【重要】以前は保存失敗時に console.error のみで、画面上は何のエラーも出ないまま
       // 受付・退館が「完了しました」と表示されてしまい、実際には記録が保存されていない
@@ -14181,10 +14278,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     }
 
     function renderVisitQRCode(container, visitId) {
-      // 院内スキャナー（QRコードリーダー）で確実に読み取れる本物のQRコードを生成する。
+      // 退館手続き画面のカメラで確実に読み取れる本物のQRコードを生成する。
       // qrcode-generator（同梱・オフライン動作、外部通信なし）を使用。
-      // スキャナーはキーボード入力としてデコード結果（=visitIdそのもの）を送出するため、
-      // screen-checkout の入力欄にそのまま読み込ませることができる。
       try {
         const qr = qrcode(0, 'M'); // typeNumber 0 = 内容に応じて自動でサイズ決定
         qr.addData(visitId);
@@ -14442,27 +14537,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       const saved = saveVisitLog();
       if (!saved) return;
 
+      // 端末をつけっぱなしのまま日付が変わっても取りこぼさないよう、受付完了のたびにも確認する
+      maybeRunAutoBackup();
+
       showScreen('screen-complete');
     }
 
     function submitRepeatVisit() {
       submitNewVisit();
-    }
-
-    function submitCheckout() {
-      // QRスキャナー（またはEnterキー）からの送信。
-      // 【確認画面を挟まない理由】QRスキャンは面会者本人が持っている物理的な面会証を
-      // 読み取る行為であり、手入力のような1桁の打ち間違いは起こりにくいため、
-      // 従来通り確認画面を挟まず即座に処理する（スキャンして終わり、が前提のUX）。
-      const input = document.getElementById('checkout-input');
-      const visitId = input.value.trim();
-      // 【重要】読み取り後は必ず空にする。以前はここでクリアしておらず、
-      // 一度読み取りに失敗（該当なし等）した後にもう一度スキャンすると、
-      // 前回分の文字列の後ろに新しい読み取り結果が連結されてしまい、
-      // 何度スキャンしても「受付番号が見つかりません」になる不具合があった。
-      input.value = '';
-      if (!visitId) return;
-      commitCheckout(visitId);
     }
 
     function submitCheckoutManual() {
@@ -14564,9 +14646,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       // 完了メッセージだけを画面中央に大きく表示する。
       document.getElementById('checkout-scan-view').style.display = 'none';
       document.getElementById('checkout-manual-view').style.display = 'none';
-      // 退館が確定したのでカメラはもう不要。呼び出し元（カメラ読み取り／外付けスキャナー／
-      // 手入力確認後のいずれでも）を問わず、ここで確実にカメラを停止・解放する。
+      // 退館が確定したのでカメラはもう不要。呼び出し元（カメラ読み取り／手入力確認後の
+      // いずれでも）を問わず、ここで確実にカメラを停止・解放する。
       stopCheckoutCamera();
+
+      // 端末をつけっぱなしのまま日付が変わっても取りこぼさないよう、退館完了のたびにも確認する
+      maybeRunAutoBackup();
 
       // 【表記の分かりやすさ改善】「患者様: 山田太郎」だけだと、山田太郎様ご本人が
       // 退館（退院）するように読めてしまう。ここで表示しているのは「面会先の患者様」
@@ -14617,6 +14702,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       document.addEventListener('click', resetIdleTimer);
       document.addEventListener('touchend', resetIdleTimer);
       showScreen('screen-top');
+
+      // 起動時に1回、および受付・退館の度に日付が変わっていないかを確認する（maybeRunAutoBackup参照）。
+      // 端末を再起動せず何日もつけっぱなしにするケースに備え、念のため30分ごとにも確認しておく。
+      maybeRunAutoBackup();
+      setInterval(maybeRunAutoBackup, 30 * 60 * 1000);
     }
 
     document.addEventListener('DOMContentLoaded', initApp);
