@@ -379,7 +379,10 @@
                  ・患者本人の父母・子は「実子」等の区分をなくし単一の選択にした
                    （面会の許可・制限は続柄の細分ではなく、個別設定で行う方針のため）。
                  ・配偶者の兄弟姉妹のお子様（配偶者側の甥・姪）も追加した。 -->
-            <svg id="family-tree" viewBox="0 0 1080 820" xmlns="http://www.w3.org/2000/svg" style="width: 1080px; height: 820px; flex-shrink: 0; background: white; border: 1px solid #ddd; border-radius: 8px;">
+            <!-- 左右・上下ともスクロールなしにするため、固定px指定をやめてコンテナに合わせて
+                 縦横比を保ったまま自動縮小させる（preserveAspectRatio既定のxMidYMid meet）。
+                 実機の画面サイズによって縮小率・文字の実寸は変わる。 -->
+            <svg id="family-tree" viewBox="0 0 1080 820" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%; background: white; border: 1px solid #ddd; border-radius: 8px;">
               <!-- 父母 → （兄弟姉妹／患者さま）の兄弟関係 -->
               <line x1="280" y1="108" x2="280" y2="140" stroke="#999" stroke-width="3"/>
               <line x1="150" y1="140" x2="410" y2="140" stroke="#999" stroke-width="3"/>
