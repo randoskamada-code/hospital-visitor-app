@@ -257,11 +257,15 @@
         <div class="screen-content">
           <div class="input-display" id="kana-display">-</div>
           <div id="search-message" class="message-box"></div>
-          <div id="kana-keyboard"></div>
-          <div style="display: flex; gap: var(--gap); margin-top: 20px;">
-            <button class="btn-large" onclick="clearInput()">訂正</button>
-            <button class="btn-large" onclick="backspaceInput()">←</button>
-            <button class="btn-large" id="kana-submit-btn" onclick="submitKana()" disabled>さがす</button>
+          <!-- 50音キーパッドの下に「訂正・←・さがす」を積むと縦に長くなりスクロールが
+               必要になっていたため、キーパッドの横に並べて縦方向を圧縮した。 -->
+          <div style="display: flex; gap: 20px; align-items: center; justify-content: center;">
+            <div id="kana-keyboard"></div>
+            <div style="display: flex; flex-direction: column; gap: var(--gap); justify-content: center; align-self: stretch;">
+              <button class="btn-large" onclick="clearInput()" style="flex: 1;">訂正</button>
+              <button class="btn-large" onclick="backspaceInput()" style="flex: 1;">←</button>
+              <button class="btn-large" id="kana-submit-btn" onclick="submitKana()" disabled style="flex: 1;">さがす</button>
+            </div>
           </div>
         </div>
         <button class="reset-button" onclick="goTop()">最初に戻る</button>
