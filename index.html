@@ -187,6 +187,9 @@
     .checkout-scan-sub { font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 30px; }
     .checkout-scan-sub.is-error { color: var(--color-alert); font-weight: 600; }
     .checkout-manual-link { background: none; border: none; color: var(--color-text-sub); text-decoration: underline; font-size: var(--fs-xs); font-weight: 600; padding: 12px; cursor: pointer; }
+    /* 関係選択ページ・右側の「その他のご関係」リンク：主要な語（父方のご親族 等）だけ
+       ひと回り大きく太字にして目立たせる。補足の（　）部分は通常の太さのまま。 */
+    .checkout-manual-link-main { font-size: 1.25em; font-weight: 800; color: var(--color-text); }
     .checkout-camera-switch-btn { display: inline-flex; align-items: center; gap: 6px; background: white; border: 2px solid var(--color-primary); color: var(--color-primary); border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; padding: 8px 18px; cursor: pointer; margin-bottom: 15px; }
     #checkout-manual-view { display: flex; }
     #checkout-manual-display { max-width: 500px; letter-spacing: 6px; }
@@ -414,7 +417,7 @@
               <rect id="sibling-node" x="40" y="200" width="220" height="78" fill="#e8f5f5" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
               <text x="150" y="249" text-anchor="middle" font-size="26" font-weight="bold" pointer-events="none">兄弟姉妹</text>
 
-              <rect id="patient-node" x="300" y="200" width="220" height="78" fill="#fff9e6" stroke="#4A9B6F" stroke-width="3" rx="12"/>
+              <rect id="patient-node" x="300" y="200" width="220" height="78" fill="#fff9e6" stroke="#4A9B6F" stroke-width="5" rx="12"/>
               <text x="410" y="249" text-anchor="middle" font-size="27" font-weight="bold" pointer-events="none">患者さま</text>
 
               <rect id="spouse-node" x="560" y="200" width="220" height="78" fill="#e8f5e9" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
@@ -445,9 +448,11 @@
             <div style="font-size: var(--fs-sm); color: #666;">その他のご関係</div>
             <!-- 右側の列は幅が狭いため、ボタンは横並びではなく縦に積む。文字は折り返し可（white-space:normal）。 -->
             <div style="display: flex; flex-direction: column; align-items: stretch; gap: 12px; width: 100%;">
-              <button class="checkout-manual-link" id="paternal-extended-link" onclick="showRelationDetail('父方のご親族', 'paternal-extended')" style="white-space: normal;">父方のご親族（祖父母・叔父叔母・いとこ）はこちら</button>
-              <button class="checkout-manual-link" id="maternal-extended-link" onclick="showRelationDetail('母方のご親族', 'maternal-extended')" style="white-space: normal;">母方のご親族（祖父母・叔父叔母・いとこ）はこちら</button>
-              <button class="checkout-manual-link" id="guardian-link" onclick="showRelationDetail('後見人・その他', 'guardian')" style="white-space: normal;">ご家族・ご親族以外の方（後見人など）はこちら</button>
+              <!-- 主要な語（父方のご親族 等）を太字・大きめにし、（　）の補足部分は改行して
+                   読みやすくした。 -->
+              <button class="checkout-manual-link" id="paternal-extended-link" onclick="showRelationDetail('父方のご親族', 'paternal-extended')" style="white-space: normal;"><span class="checkout-manual-link-main">父方のご親族</span><br>（祖父母・叔父叔母・いとこ）はこちら</button>
+              <button class="checkout-manual-link" id="maternal-extended-link" onclick="showRelationDetail('母方のご親族', 'maternal-extended')" style="white-space: normal;"><span class="checkout-manual-link-main">母方のご親族</span><br>（祖父母・叔父叔母・いとこ）はこちら</button>
+              <button class="checkout-manual-link" id="guardian-link" onclick="showRelationDetail('後見人・その他', 'guardian')" style="white-space: normal;"><span class="checkout-manual-link-main">ご家族・ご親族以外の方</span><br>（後見人など）はこちら</button>
             </div>
           </div>
         </div>
