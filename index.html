@@ -355,77 +355,113 @@
       <section class="screen" id="screen-relation">
         <button class="back-button" onclick="goBack()">← 戻る</button>
         <div style="text-align: center; width: 100%; margin-bottom: 20px; font-size: var(--fs-md); font-weight: 600;">患者さまとのご関係をお選びください</div>
-        <div class="screen-content" style="width: 100%; overflow: auto;">
-          <!-- 親等図：
-               ・以前のバージョンは「叔父」の枠だけなのに、詳細選択肢に「叔母」「伯母」まで
-                 出てきてしまい分かりにくいとの指摘を受け、枠の表記を「叔父・叔母」に変更した。
-               ・「甥・姪」「兄弟姉妹」「いとこ」の枠を追加した。
-               ・祖父母の下の線が、分岐する横線の範囲からはみ出た位置につながっていて
-                 見た目上ちぎれていた（祖父母の真下 x=600 から線を伸ばしていたのに、
-                 分岐の横線は x=190〜450 の範囲にしかなかった）不具合を修正。
-                 祖父母を分岐の中心（叔父・叔母と父の中間）の真上に配置し直すことで、
-                 縦線が必ず横線の範囲内に収まるようにした。父・母の夫婦線から患者・兄弟姉妹へ
-                 分岐する線、患者・配偶者の夫婦線から子へ下りる線も同様の考え方で統一した。 -->
-          <svg id="family-tree" viewBox="0 0 1200 920" xmlns="http://www.w3.org/2000/svg" style="width: 100%; max-width: 1200px; height: auto; background: white; border: 1px solid #ddd; border-radius: 8px;">
-            <!-- 祖父母 → （叔父・叔母／父）の兄弟関係 -->
-            <line x1="270" y1="100" x2="270" y2="140" stroke="#999" stroke-width="3"/>
-            <line x1="150" y1="140" x2="390" y2="140" stroke="#999" stroke-width="3"/>
-            <line x1="150" y1="140" x2="150" y2="170" stroke="#999" stroke-width="3"/>
-            <line x1="390" y1="140" x2="390" y2="170" stroke="#999" stroke-width="3"/>
-            <!-- 叔父・叔母 → いとこ -->
-            <line x1="150" y1="240" x2="150" y2="340" stroke="#999" stroke-width="3"/>
+        <div class="screen-content" id="family-tree-scroll" style="width: 100%; overflow: auto; justify-content: flex-start;">
+          <!-- 親等図（拡張版）：
+               ・父方／母方それぞれの祖父母・叔父叔母・いとこを別々に選べるようにした。
+               ・配偶者側の父母・兄弟姉妹（義父母・義兄弟姉妹）を追加した。
+               ・文字をさらに大きくしつつ枠の数も増やしたため、画面幅に収まりきらない分は
+                 横スクロールで見られるようにした（枠を無理に縮小して文字が小さくなるのを防ぐため）。
+               ・「いとこ」は年上年下の判定基準（従兄・従弟等）が分かりにくいとの指摘を受け、
+                 性別のみで選べる形（従兄弟・従姉妹）に簡略化した。
+               ・患者本人の父母・子は「実子」等の区分をなくし単一の選択にした
+                 （面会の許可・制限は続柄の細分ではなく、氏名ベースの個別設定で行う方針のため）。 -->
+          <svg id="family-tree" viewBox="0 0 1650 980" xmlns="http://www.w3.org/2000/svg" style="width: 1650px; height: 980px; flex-shrink: 0; background: white; border: 1px solid #ddd; border-radius: 8px;">
+            <!-- 父方祖父母 → （父方叔父・叔母／父）の兄弟関係 -->
+            <line x1="270" y1="108" x2="270" y2="150" stroke="#999" stroke-width="3"/>
+            <line x1="150" y1="150" x2="390" y2="150" stroke="#999" stroke-width="3"/>
+            <line x1="150" y1="150" x2="150" y2="190" stroke="#999" stroke-width="3"/>
+            <line x1="390" y1="150" x2="390" y2="190" stroke="#999" stroke-width="3"/>
+            <!-- 母方祖父母 → （母／母方叔父・叔母）の兄弟関係 -->
+            <line x1="1070" y1="108" x2="1070" y2="150" stroke="#999" stroke-width="3"/>
+            <line x1="690" y1="150" x2="1450" y2="150" stroke="#999" stroke-width="3"/>
+            <line x1="690" y1="150" x2="690" y2="190" stroke="#999" stroke-width="3"/>
+            <line x1="1450" y1="150" x2="1450" y2="190" stroke="#999" stroke-width="3"/>
+            <!-- 父方叔父・叔母 → 父方いとこ / 母方叔父・叔母 → 母方いとこ -->
+            <line x1="150" y1="268" x2="150" y2="360" stroke="#999" stroke-width="3"/>
+            <line x1="1450" y1="268" x2="1450" y2="360" stroke="#999" stroke-width="3"/>
             <!-- 父 ⚭ 母（夫婦） -->
-            <line x1="490" y1="205" x2="590" y2="205" stroke="#999" stroke-width="4"/>
+            <line x1="500" y1="229" x2="580" y2="229" stroke="#999" stroke-width="4"/>
             <!-- 父・母の夫婦線の中央 → （兄弟姉妹／患者）の兄弟関係 -->
-            <line x1="540" y1="205" x2="540" y2="270" stroke="#999" stroke-width="3"/>
-            <line x1="410" y1="270" x2="670" y2="270" stroke="#999" stroke-width="3"/>
-            <line x1="410" y1="270" x2="410" y2="340" stroke="#999" stroke-width="3"/>
-            <line x1="670" y1="270" x2="670" y2="340" stroke="#999" stroke-width="3"/>
+            <line x1="540" y1="229" x2="540" y2="300" stroke="#999" stroke-width="3"/>
+            <line x1="410" y1="300" x2="670" y2="300" stroke="#999" stroke-width="3"/>
+            <line x1="410" y1="300" x2="410" y2="360" stroke="#999" stroke-width="3"/>
+            <line x1="670" y1="300" x2="670" y2="360" stroke="#999" stroke-width="3"/>
+            <!-- 配偶者の父母 → （配偶者／配偶者の兄弟姉妹）の兄弟関係 -->
+            <line x1="1060" y1="268" x2="1060" y2="300" stroke="#999" stroke-width="3"/>
+            <line x1="930" y1="300" x2="1190" y2="300" stroke="#999" stroke-width="3"/>
+            <line x1="930" y1="300" x2="930" y2="360" stroke="#999" stroke-width="3"/>
+            <line x1="1190" y1="300" x2="1190" y2="360" stroke="#999" stroke-width="3"/>
             <!-- 兄弟姉妹 → 甥・姪 -->
-            <line x1="410" y1="410" x2="410" y2="500" stroke="#999" stroke-width="3"/>
-            <!-- 患者 ⚭ 配偶者（夫婦） -->
-            <line x1="770" y1="375" x2="830" y2="375" stroke="#999" stroke-width="4"/>
-            <!-- 患者・配偶者の夫婦線の中央 → 子・孫・ひ孫 -->
-            <line x1="800" y1="375" x2="800" y2="500" stroke="#999" stroke-width="3"/>
-            <line x1="800" y1="570" x2="800" y2="650" stroke="#999" stroke-width="3"/>
-            <line x1="800" y1="720" x2="800" y2="800" stroke="#999" stroke-width="3"/>
+            <line x1="410" y1="438" x2="410" y2="530" stroke="#999" stroke-width="3"/>
+            <!-- 患者さま ⚭ 配偶者（夫婦） -->
+            <line x1="780" y1="399" x2="820" y2="399" stroke="#999" stroke-width="4"/>
+            <!-- 患者さま・配偶者の夫婦線の中央 → 子・孫・ひ孫 -->
+            <line x1="800" y1="399" x2="800" y2="530" stroke="#999" stroke-width="3"/>
+            <line x1="800" y1="608" x2="800" y2="690" stroke="#999" stroke-width="3"/>
+            <line x1="800" y1="768" x2="800" y2="850" stroke="#999" stroke-width="3"/>
 
-            <rect id="gp-node" x="170" y="30" width="200" height="70" fill="#e8f0ff" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="270" y="74" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">祖父母</text>
+            <rect id="gp-father-node" x="160" y="30" width="220" height="78" fill="#e8f0ff" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="270" y="58" text-anchor="middle" font-size="16" font-weight="600" fill="#666" pointer-events="none">父方</text>
+            <text x="270" y="90" text-anchor="middle" font-size="22" font-weight="bold" pointer-events="none">祖父母</text>
 
-            <rect id="uncle-node" x="50" y="170" width="200" height="70" fill="#f0f0e8" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="150" y="214" text-anchor="middle" font-size="26" font-weight="bold" pointer-events="none">叔父・叔母</text>
+            <rect id="gp-mother-node" x="960" y="30" width="220" height="78" fill="#f0e8ff" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="1070" y="58" text-anchor="middle" font-size="16" font-weight="600" fill="#666" pointer-events="none">母方</text>
+            <text x="1070" y="90" text-anchor="middle" font-size="22" font-weight="bold" pointer-events="none">祖父母</text>
 
-            <rect id="father-node" x="290" y="170" width="200" height="70" fill="#fff0e8" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="390" y="214" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">父</text>
+            <rect id="uncle-node" x="40" y="190" width="220" height="78" fill="#f0f0e8" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="150" y="218" text-anchor="middle" font-size="16" font-weight="600" fill="#666" pointer-events="none">父方</text>
+            <text x="150" y="250" text-anchor="middle" font-size="22" font-weight="bold" pointer-events="none">叔父・叔母</text>
 
-            <rect id="mother-node" x="590" y="170" width="200" height="70" fill="#ffe8f0" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="690" y="214" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">母</text>
+            <rect id="father-node" x="280" y="190" width="220" height="78" fill="#fff0e8" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="390" y="238" text-anchor="middle" font-size="32" font-weight="bold" pointer-events="none">父</text>
 
-            <rect id="cousin-node" x="50" y="340" width="200" height="70" fill="#f5f0e8" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="150" y="384" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">いとこ</text>
+            <rect id="mother-node" x="580" y="190" width="220" height="78" fill="#ffe8f0" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="690" y="238" text-anchor="middle" font-size="32" font-weight="bold" pointer-events="none">母</text>
 
-            <rect id="sibling-node" x="310" y="340" width="200" height="70" fill="#e8f5f5" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="410" y="384" text-anchor="middle" font-size="26" font-weight="bold" pointer-events="none">兄弟姉妹</text>
+            <rect id="uncle-mother-node" x="1340" y="190" width="220" height="78" fill="#e8f5ff" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="1450" y="218" text-anchor="middle" font-size="16" font-weight="600" fill="#666" pointer-events="none">母方</text>
+            <text x="1450" y="250" text-anchor="middle" font-size="22" font-weight="bold" pointer-events="none">叔父・叔母</text>
 
-            <rect id="patient-node" x="570" y="340" width="200" height="70" fill="#fff9e6" stroke="#4A9B6F" stroke-width="3" rx="10"/>
-            <text x="670" y="384" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">【患者】</text>
+            <rect id="spouse-parent-node" x="950" y="190" width="220" height="78" fill="#e8fff0" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="1060" y="218" text-anchor="middle" font-size="16" font-weight="600" fill="#666" pointer-events="none">配偶者の</text>
+            <text x="1060" y="250" text-anchor="middle" font-size="22" font-weight="bold" pointer-events="none">父母</text>
 
-            <rect id="spouse-node" x="830" y="340" width="200" height="70" fill="#e8f5e9" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="930" y="384" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">配偶者</text>
+            <rect id="cousin-node" x="40" y="360" width="220" height="78" fill="#f5f0e8" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="150" y="388" text-anchor="middle" font-size="16" font-weight="600" fill="#666" pointer-events="none">父方</text>
+            <text x="150" y="420" text-anchor="middle" font-size="22" font-weight="bold" pointer-events="none">いとこ</text>
 
-            <rect id="niece-node" x="310" y="500" width="200" height="70" fill="#eef5e8" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="410" y="544" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">甥・姪</text>
+            <rect id="sibling-node" x="300" y="360" width="220" height="78" fill="#e8f5f5" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="410" y="409" text-anchor="middle" font-size="26" font-weight="bold" pointer-events="none">兄弟姉妹</text>
 
-            <rect id="child-node" x="700" y="500" width="200" height="70" fill="#e8eff5" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="800" y="544" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">子</text>
+            <rect id="patient-node" x="560" y="360" width="220" height="78" fill="#fff9e6" stroke="#4A9B6F" stroke-width="3" rx="12"/>
+            <text x="670" y="409" text-anchor="middle" font-size="27" font-weight="bold" pointer-events="none">患者さま</text>
 
-            <rect id="grandchild-node" x="700" y="650" width="200" height="70" fill="#f0e8f5" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="800" y="694" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">孫</text>
+            <rect id="spouse-node" x="820" y="360" width="220" height="78" fill="#e8f5e9" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="930" y="409" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">配偶者</text>
 
-            <rect id="ggchild-node" x="700" y="800" width="200" height="70" fill="#f5e8f0" stroke="#4A9B6F" stroke-width="2" rx="10" cursor="pointer"/>
-            <text x="800" y="844" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">ひ孫</text>
+            <rect id="spouse-sibling-node" x="1080" y="360" width="220" height="78" fill="#f0fff5" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="1190" y="388" text-anchor="middle" font-size="16" font-weight="600" fill="#666" pointer-events="none">配偶者の</text>
+            <text x="1190" y="420" text-anchor="middle" font-size="22" font-weight="bold" pointer-events="none">兄弟姉妹</text>
+
+            <rect id="cousin-mother-node" x="1340" y="360" width="220" height="78" fill="#f0e8f0" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="1450" y="388" text-anchor="middle" font-size="16" font-weight="600" fill="#666" pointer-events="none">母方</text>
+            <text x="1450" y="420" text-anchor="middle" font-size="22" font-weight="bold" pointer-events="none">いとこ</text>
+
+            <rect id="niece-node" x="300" y="530" width="220" height="78" fill="#eef5e8" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="410" y="579" text-anchor="middle" font-size="26" font-weight="bold" pointer-events="none">甥・姪</text>
+
+            <rect id="child-node" x="690" y="530" width="220" height="78" fill="#e8eff5" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="800" y="579" text-anchor="middle" font-size="32" font-weight="bold" pointer-events="none">子</text>
+
+            <rect id="grandchild-node" x="690" y="690" width="220" height="78" fill="#f0e8f5" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="800" y="739" text-anchor="middle" font-size="32" font-weight="bold" pointer-events="none">孫</text>
+
+            <rect id="ggchild-node" x="690" y="850" width="220" height="78" fill="#f5e8f0" stroke="#4A9B6F" stroke-width="2" rx="12" cursor="pointer"/>
+            <text x="800" y="899" text-anchor="middle" font-size="28" font-weight="bold" pointer-events="none">ひ孫</text>
           </svg>
+        </div>
+        <div style="text-align: center; margin-top: 10px;">
+          <button class="checkout-manual-link" onclick="showRelationDetail('後見人・その他', 'guardian')">ご家族・ご親族以外の方（後見人など）はこちら</button>
         </div>
         <div id="relation-detail-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
           <div style="background: white; padding: 30px; border-radius: 16px; text-align: center; max-width: 600px;">
@@ -13168,6 +13204,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
               btn.style.color = 'white';
             }
           });
+        } else if (screenId === 'screen-relation') {
+          // 親等図：画面に入るたびに表示位置をリセットする。
+          // 枠が画面幅・高さに収まりきらないため横スクロールになるが、
+          // 何も指定しないと中途半端にスクロールされた状態（上端や左右の枠が
+          // 見切れた状態）で表示されてしまう。そこで「いちばん上」かつ
+          // 「患者さまの枠が横方向の中央にくる」位置を初期表示にする。
+          setTimeout(() => resetFamilyTreeScroll(), 0);
         }
         updateInputDisplay();
         if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete') startIdleTimer();
@@ -14389,24 +14432,48 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       showScreen('screen-relation');
     }
 
+    function resetFamilyTreeScroll() {
+      const container = document.getElementById('family-tree-scroll');
+      const patientNode = document.getElementById('patient-node');
+      if (!container || !patientNode) return;
+      // 縦方向は常にいちばん上（父方祖父母・母方祖父母の行）から見えるようにする
+      container.scrollTop = 0;
+      // 横方向は「患者さま」の枠が中央にくるように調整する
+      const patientCenterX = parseFloat(patientNode.getAttribute('x')) + parseFloat(patientNode.getAttribute('width')) / 2;
+      const svg = document.getElementById('family-tree');
+      const viewBox = svg.viewBox.baseVal;
+      // viewBox座標 → 実際の描画ピクセル座標へ変換（svgはviewBoxと1:1のwidth/heightで描画しているため等倍）
+      const scale = svg.getBoundingClientRect().width / viewBox.width;
+      const patientCenterPx = patientCenterX * scale;
+      const targetScrollLeft = patientCenterPx - container.clientWidth / 2;
+      container.scrollLeft = Math.max(0, targetScrollLeft);
+    }
+
     function showRelationDetail(relationName, nodeId) {
       const details = {
-        '父': ['実父', '継父', '義父'],
-        '母': ['実母', '継母', '義母'],
+        // 【簡略化】以前は父・母・子に「実父/継父/義父」等の区分があったが、面会の許可・制限は
+        // 続柄の細分では行わず、氏名ベースの個別設定で行う方針のため、ここでの区分は廃止した
+        // （父・母・子はキーを持たせず、下の既定処理でそのまま関係名として使う）。
         '配偶者': ['夫', '妻'],
-        '子': ['実子', '継子', '養子'],
-        '孫': ['孫'],
-        'ひ孫': ['ひ孫'],
-        '祖父母': ['祖父', '祖母'],
+        '父方祖父母': ['父方の祖父', '父方の祖母'],
+        '母方祖父母': ['母方の祖父', '母方の祖母'],
         // 【表記の分かりやすさ改善】以前は枠の表記が「叔父」だけなのに、選択肢に
         // 「叔母」「伯母」まで出てきて分かりにくいとの指摘を受けた。枠の表記自体を
         // 「叔父・叔母」に変え、選択肢（父母の兄・弟・姉・妹にあたる呼び方）と一致させた。
-        '叔父・叔母': ['伯父', '叔父', '伯母', '叔母'],
+        // この基準（親より年上か年下か）は分かりやすいため、年齢区分はそのまま残す。
+        '父方叔父・叔母': ['父方の伯父', '父方の叔父', '父方の伯母', '父方の叔母'],
+        '母方叔父・叔母': ['母方の伯父', '母方の叔父', '母方の伯母', '母方の叔母'],
         '兄弟姉妹': ['兄', '弟', '姉', '妹'],
-        // 「いとこ」は表記としては性別・年齢を問わない一般的な呼び方だが、
-        // 選択肢では正式な漢字表記（従兄・従弟・従姉・従妹）から選べるようにする。
-        'いとこ': ['従兄', '従弟', '従姉', '従妹'],
-        '甥・姪': ['甥', '姪']
+        // 【簡略化】「いとこ」の従兄・従弟・従姉・従妹という呼び分けは、
+        // 「自分より年上か年下か」という来館者本人にしか分からない基準で決まり、
+        // その場で即座に判断しにくいとの指摘を受けたため、性別のみで選べる形にした。
+        '父方いとこ': ['父方の従兄弟', '父方の従姉妹'],
+        '母方いとこ': ['母方の従兄弟', '母方の従姉妹'],
+        '甥・姪': ['甥', '姪'],
+        '配偶者の父母': ['義父', '義母'],
+        '配偶者の兄弟姉妹': ['義兄', '義姉', '義弟', '義妹'],
+        // 家族・親族ではない来館者（成年後見人など）向けの選択肢。
+        '後見人・その他': ['後見人', 'その他']
       };
 
       const modal = document.getElementById('relation-detail-modal');
@@ -14688,11 +14755,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       document.getElementById('child-node').onclick = () => showRelationDetail('子', 'child');
       document.getElementById('grandchild-node').onclick = () => showRelationDetail('孫', 'grandchild');
       document.getElementById('ggchild-node').onclick = () => showRelationDetail('ひ孫', 'ggchild');
-      document.getElementById('gp-node').onclick = () => showRelationDetail('祖父母', 'gp');
-      document.getElementById('uncle-node').onclick = () => showRelationDetail('叔父・叔母', 'uncle');
+      document.getElementById('gp-father-node').onclick = () => showRelationDetail('父方祖父母', 'gp-father');
+      document.getElementById('gp-mother-node').onclick = () => showRelationDetail('母方祖父母', 'gp-mother');
+      document.getElementById('uncle-node').onclick = () => showRelationDetail('父方叔父・叔母', 'uncle');
+      document.getElementById('uncle-mother-node').onclick = () => showRelationDetail('母方叔父・叔母', 'uncle-mother');
       document.getElementById('sibling-node').onclick = () => showRelationDetail('兄弟姉妹', 'sibling');
-      document.getElementById('cousin-node').onclick = () => showRelationDetail('いとこ', 'cousin');
+      document.getElementById('cousin-node').onclick = () => showRelationDetail('父方いとこ', 'cousin');
+      document.getElementById('cousin-mother-node').onclick = () => showRelationDetail('母方いとこ', 'cousin-mother');
       document.getElementById('niece-node').onclick = () => showRelationDetail('甥・姪', 'niece');
+      document.getElementById('spouse-parent-node').onclick = () => showRelationDetail('配偶者の父母', 'spouse-parent');
+      document.getElementById('spouse-sibling-node').onclick = () => showRelationDetail('配偶者の兄弟姉妹', 'spouse-sibling');
 
       setInterval(updateClock, 1000);
       updateClock();
