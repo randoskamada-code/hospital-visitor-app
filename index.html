@@ -748,6 +748,8 @@
                       <option value="長女">長女</option>
                       <option value="次女">次女</option>
                       <option value="三女以降">三女以降</option>
+                      <option value="息子の嫁">息子の嫁（子の配偶者）</option>
+                      <option value="娘の婿">娘の婿（子の配偶者）</option>
                       <option value="孫">孫</option>
                       <option value="ひ孫">ひ孫</option>
                       <option value="兄">兄</option>
@@ -14857,19 +14859,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     const FAMILY_RELATION_SET = new Set([
       '父', '母', '夫', '妻', '兄', '弟', '姉', '妹', '子', '孫', 'ひ孫', '甥', '姪',
       '義父', '義母', '義兄', '義姉', '義弟', '義妹',
-      '長男', '次男', '三男以降', '長女', '次女', '三女以降',
+      '長男', '次男', '三男以降', '長女', '次女', '三女以降', '息子の嫁', '娘の婿',
       '父方の祖父', '父方の祖母', '父方の伯父', '父方の叔父', '父方の伯母', '父方の叔母', '父方の従兄弟', '父方の従姉妹',
       '母方の祖父', '母方の祖母', '母方の伯父', '母方の叔父', '母方の伯母', '母方の叔母', '母方の従兄弟', '母方の従姉妹'
     ]);
     // 「子」を選んだ場合の詳細区分。面会制限ルールのある患者様の場合のみ選択肢として表示する
     // （通常の面会では、今まで通り「子」の一括りのままで、余計な入力を増やさない）。
     const CHILD_ORDINAL_OPTIONS = ['長男', '次男', '三男以降', '長女', '次女', '三女以降'];
+    // 「子の配偶者」（嫁・婿）。【重要】あえて CHILD_ORDINAL_OPTIONS とは別の配列にしている。
+    // 「長男は良いが嫁は不可」のように、血縁の子と結婚で家族になった配偶者とで許可の可否を
+    // 分けたいケースがあるため、ルール側の続柄が「子」（長男・次男等どれでも良い、の意味）でも、
+    // 嫁・婿は自動的には一致させない。嫁・婿を許可したい場合は、管理画面で
+    // 「息子の嫁」「娘の婿」を続柄に指定した別のルールを明示的に追加する。
+    const CHILD_SPOUSE_OPTIONS = ['息子の嫁', '娘の婿'];
 
     // 1件のルールが、来館者が選んだ続柄に一致するか。
     // 【長男・次男等の扱いについて】これらは「子」の詳細区分だが、特別扱いはせず「妻」「兄」等と
     // 同じ1つの続柄の値として扱う（AppState.relation にそのまま入る）。唯一の特例は、
     // ルール側の続柄が「子」（長男・次男等の指定なし）の場合に、長男・次男等どれであっても
-    // 「子」全般として一致させる点だけ。
+    // 「子」全般として一致させる点だけ（この特例に「息子の嫁」「娘の婿」は含めない＝上記コメント参照）。
     function relationMatchesRule(rule, effectiveRelation) {
       if (rule.relation === 'ANY_FAMILY') return FAMILY_RELATION_SET.has(effectiveRelation);
       if (rule.relation === '子') {
@@ -15541,11 +15549,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         '後見人・その他': ['後見人', '友人・知人', '職場関係者', 'ケアマネジャー・施設関係者', 'その他']
       };
 
-      // 面会制限ルールのある患者様の場合のみ、「子」を長男・次男…と区別できるようにする
-      // （通常の面会では、今まで通り「子」の一括りのまま。CHILD_ORDINAL_OPTIONSはcheckRestriction
-      // 付近で定義）。
+      // 面会制限ルールのある患者様の場合のみ、「子」を長男・次男…と区別し、また「子の配偶者
+      // （嫁・婿）」も選べるようにする（通常の面会では、今まで通り「子」の一括りのまま。
+      // CHILD_ORDINAL_OPTIONS・CHILD_SPOUSE_OPTIONSはcheckRestriction付近で定義）。
+      // 【「長男は良いが嫁は不可」に対応するため】この2つを別々の選択肢として並べている
+      // （relationMatchesRuleのコメント参照）。
       if (relationName === '子' && AppState.selectedPatient && AppState.selectedPatient.restrictionRules && AppState.selectedPatient.restrictionRules.length > 0) {
-        details['子'] = CHILD_ORDINAL_OPTIONS.slice();
+        details['子'] = CHILD_ORDINAL_OPTIONS.concat(CHILD_SPOUSE_OPTIONS);
       }
 
       const modal = document.getElementById('relation-detail-modal');
