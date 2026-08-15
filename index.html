@@ -537,7 +537,7 @@
         <button class="reset-button" onclick="goTop()">最初に戻る</button>
       </section>
       <section class="screen" id="screen-complete">
-        <button class="back-button" onclick="goBack()">← 戻る</button>
+        <button class="back-button" id="complete-back-btn" onclick="goBack()">← 戻る</button>
         <div class="screen-content">
           <div class="complete-title">受付が完了しました</div>
           <div id="visit-pass">
@@ -558,7 +558,7 @@
               <div class="pass-id" id="pass-id"></div>
             </div>
           </div>
-          <div class="two-button-row no-print" style="margin-top: 40px;">
+          <div class="two-button-row no-print" id="complete-button-row" style="margin-top: 40px;">
             <button class="btn-confirm" onclick="printLabel()">面会証を印刷する</button>
             <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="finishCompleteScreen()">終了して最初に戻る</button>
           </div>
@@ -13252,7 +13252,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         updateInputDisplay();
         if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete') startIdleTimer();
         else if (screenId === 'screen-blocked') startBlockedTimer();
-        else if (screenId === 'screen-complete') startCompleteTimer();
+        else if (screenId === 'screen-complete') { startCompleteTimer(); resetCompleteBackButton(); }
       }
     }
 
@@ -13304,6 +13304,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     // 直接伝える文言にしている。
     // （20秒経過による自動リセットの場合は、その場に人がいない前提のため確認は挟まない＝
     // startIdleTimer から直接 goTop() を呼ぶ経路はそのまま残している。）
+    // 受付完了画面（screen-complete）に新しく入るたびに、左上の「← 戻る」ボタンを
+    // 必ず表示状態に戻す（印刷後に非表示にした状態が次の来客に持ち越されないように）。
+    // 【印刷後に戻るボタンを隠す理由】
+    // 「印刷する」ボタンで面会証を印刷し受付を保存した後は、画面をスクロールしないと
+    // 見えない下側の「終了して最初に戻る」よりも、常に見えている左上の「← 戻る」の方に
+    // 目が行ってしまい、誤ってそちらを押してしまうという指摘があった。「← 戻る」は
+    // 部屋番号・電話番号入力などのやり直しのための機能だが、印刷（＝保存）後に押すと、
+    // もう一度受付を進めて再度印刷した場合に同じ来客の記録が重複して保存されてしまう
+    // おそれがある。印刷後は「← 戻る」を使う正当な理由が無くなるため非表示にし、
+    // 誤操作の入口自体をなくす。
+    function resetCompleteBackButton() {
+      const btn = document.getElementById('complete-back-btn');
+      if (btn) btn.style.display = '';
+    }
+
     function finishCompleteScreen() {
       if (AppState.currentScreen === 'screen-complete' && AppState.lastVisitRecord && !AppState.lastVisitRecord.saved) {
         const ok = confirm('面会証を印刷せずに終了します。\n退館の際に必要な面会証（QRコード）が発行されません。よろしいですか？');
@@ -14783,6 +14798,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 「印刷物はあるのに履歴には無い（＝退館手続きもできない）」状態になってしまうため。
         if (!saved) return;
         AppState.lastVisitRecord.saved = true;
+
+        // 【誤操作対策】印刷（＝保存）が完了したら、左上の「← 戻る」はもう使う場面が
+        // ないので隠し、代わりに「終了して最初に戻る」ボタンが確実に画面内に見えるように
+        // スクロールしておく。印刷ダイアログが閉じて画面に戻ってきた時、迷わず正しい
+        // ボタンを押せるようにするための対応（詳しい経緯は resetCompleteBackButton() の
+        // コメントを参照）。
+        const backBtn = document.getElementById('complete-back-btn');
+        if (backBtn) backBtn.style.display = 'none';
+        const buttonRow = document.getElementById('complete-button-row');
+        if (buttonRow) buttonRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       window.print();
     }
