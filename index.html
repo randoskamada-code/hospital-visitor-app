@@ -67,6 +67,12 @@
     .numpad-btn { width: 75px; height: 75px; font-size: 28px; padding: 0; }
     .kana-row { display: flex; gap: var(--gap); justify-content: center; }
     .kana-btn { width: var(--kana-size); height: var(--kana-size); font-size: 28px; padding: 0; }
+    /* 【スクロールなしで収める】ポップアップ内（来館者名・「その他」続柄の入力）のかなキーボードは、
+       通常画面（screen-kana等）と違って画面全体を使えないため、通常サイズのままだと
+       決定ボタンまでが画面に収まらずスクロールが必要になっていた。ポップアップ専用に
+       ボタンを一回り小さくし、行間の余白も詰めてスクロールなしで収まるようにする。 */
+    .compact-keyboard .kana-row { gap: 8px; margin-bottom: 8px; }
+    .compact-keyboard .kana-btn { width: 40px; height: 40px; font-size: 20px; }
     .input-display { font-size: var(--fs-huge); letter-spacing: 12px; text-align: center; min-height: 70px; padding: 15px; border: var(--border-w) solid var(--color-border); border-radius: var(--radius); margin-bottom: 15px; width: 90%; background-color: var(--color-primary-light); }
     .message-box { text-align: center; font-size: var(--fs-md); margin: 10px 0; padding: 15px; width: 90%; }
     #signature-canvas { border: 2px solid var(--color-border); border-radius: var(--radius); background-color: white; width: 100%; max-width: 900px; height: 200px; display: block; margin: 15px 0; }
@@ -497,31 +503,43 @@
         </div>
         <!-- 「その他」選択時のみ表示：具体的なご関係をかな入力してもらうためのミニキーボード。
              管理画面の「関係」欄・受付票にこの内容を括弧書きで表示する（formatRelationLabel参照）。 -->
+        <!-- 【スクロールなしで収める】visitor-name-modalと同様、以前は決定ボタンまでが
+             画面に収まらずスクロールが必要になっていたため、同じ形で詰めている。 -->
         <div id="relation-other-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center;">
-          <div style="background: white; padding: 30px; border-radius: 16px; text-align: center; max-width: 700px; max-height: 90vh; overflow-y: auto;">
-            <div style="font-size: var(--fs-lg); font-weight: 600; margin-bottom: 15px;">「その他」の具体的なご関係を入力してください</div>
-            <div class="input-display" id="relation-other-display">-</div>
-            <div id="relation-other-keyboard" style="margin-top: 15px;"></div>
-            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
-              <button onclick="backspaceRelationOther()" style="padding: 12px 20px; background: #ccc; border: none; border-radius: 8px; font-size: var(--fs-md); cursor: pointer;">1文字削除</button>
-              <button onclick="closeRelationOtherModal()" style="padding: 12px 20px; background: #999; color: white; border: none; border-radius: 8px; font-size: var(--fs-md); cursor: pointer;">キャンセル</button>
-              <button id="relation-other-confirm-btn" onclick="confirmRelationOther()" class="btn-large" disabled>これで決定</button>
+          <div style="background: white; padding: 16px 24px; border-radius: 16px; text-align: center; max-width: 700px; max-height: 95dvh; max-height: 95vh; overflow-y: auto;">
+            <div style="font-size: var(--fs-md); font-weight: 600; margin-bottom: 8px;">「その他」の具体的なご関係を入力してください</div>
+            <div class="input-display" id="relation-other-display" style="font-size: 34px; min-height: 44px; padding: 8px; margin-bottom: 8px; letter-spacing: 6px;">-</div>
+            <div id="relation-other-keyboard" class="compact-keyboard" style="margin-top: 8px;"></div>
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 10px; flex-wrap: wrap;">
+              <button onclick="backspaceRelationOther()" style="padding: 10px 18px; background: #ccc; border: none; border-radius: 8px; font-size: 20px; cursor: pointer;">1文字削除</button>
+              <button onclick="closeRelationOtherModal()" style="padding: 10px 18px; background: #999; color: white; border: none; border-radius: 8px; font-size: 20px; cursor: pointer;">キャンセル</button>
+              <button id="relation-other-confirm-btn" onclick="confirmRelationOther()" class="btn-large" style="padding: 10px 18px; min-height: 0; font-size: 20px;" disabled>これで決定</button>
             </div>
           </div>
         </div>
         <!-- 面会制限ルールのある患者様の面会でのみ表示：来館者ご本人のお名前（かな）を入力する
              ミニキーボード。screen-relation に入った時点で自動的に開く（showScreen参照）。
              evaluateVisitRestriction() での判定・screen-staff-reviewでのスタッフ確認に使う。 -->
+        <!-- 【スクロールなしで収める】以前はこのポップアップの縦幅が画面に収まらず、肝心の
+             「これで決定」ボタンがスクロールしないと見えない状態になっていた。パディングや
+             余白を詰め、かなキーボードもポップアップ専用に一回り小さくして(compact-keyboard)、
+             主要なタブレット画面サイズで最初から決定ボタンまで見えるようにした。 -->
         <div id="visitor-name-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1002; justify-content: center; align-items: center;">
-          <div style="background: white; padding: 30px; border-radius: 16px; text-align: center; max-width: 700px; max-height: 90vh; overflow-y: auto;">
-            <div style="font-size: var(--fs-lg); font-weight: 600; margin-bottom: 10px;">恐れ入りますが、ご来館者様のお名前をご入力ください</div>
-            <div style="font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 15px;">こちらの患者様は面会に条件がございます。確認のためご協力をお願いいたします。</div>
-            <div class="input-display" id="visitor-name-display">-</div>
-            <div id="visitor-name-keyboard" style="margin-top: 15px;"></div>
-            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
-              <button onclick="backspaceVisitorName()" style="padding: 12px 20px; background: #ccc; border: none; border-radius: 8px; font-size: var(--fs-md); cursor: pointer;">1文字削除</button>
-              <button onclick="goTop()" style="padding: 12px 20px; background: #999; color: white; border: none; border-radius: 8px; font-size: var(--fs-md); cursor: pointer;">やめて最初に戻る</button>
-              <button id="visitor-name-confirm-btn" onclick="confirmVisitorName()" class="btn-large" disabled>これで決定</button>
+          <div style="background: white; padding: 16px 24px; border-radius: 16px; text-align: center; max-width: 700px; max-height: 95dvh; max-height: 95vh; overflow-y: auto;">
+            <div style="font-size: var(--fs-md); font-weight: 600; margin-bottom: 6px;">恐れ入りますが、ご来館者様のお名前をご入力ください</div>
+            <div style="font-size: 15px; color: var(--color-text-sub); margin-bottom: 8px;">こちらの患者様は面会に条件がございます。確認のためご協力をお願いいたします。</div>
+            <div class="input-display" id="visitor-name-display" style="font-size: 34px; min-height: 44px; padding: 8px; margin-bottom: 8px; letter-spacing: 6px;">-</div>
+            <div id="visitor-name-keyboard" class="compact-keyboard" style="margin-top: 8px;"></div>
+            <!-- 【姓と名の間の空白について】かな入力のため区切りが分かりにくく、スタッフが
+                 本人確認の際に姓・名の境目を読み違えないよう、空白を入力できるボタンを用意した
+                 （マッチング判定では文字列の自動比較は行わないため、空白の有無は判定結果に影響しない）。 -->
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 6px; flex-wrap: wrap;">
+              <button onclick="pressVisitorNameKey(' ')" style="padding: 8px 16px; background: white; border: 1px solid var(--color-border); border-radius: 8px; font-size: 15px; cursor: pointer;">空白（姓と名の間に）</button>
+            </div>
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 10px; flex-wrap: wrap;">
+              <button onclick="backspaceVisitorName()" style="padding: 10px 18px; background: #ccc; border: none; border-radius: 8px; font-size: 20px; cursor: pointer;">1文字削除</button>
+              <button onclick="goTop()" style="padding: 10px 18px; background: #999; color: white; border: none; border-radius: 8px; font-size: 20px; cursor: pointer;">やめて最初に戻る</button>
+              <button id="visitor-name-confirm-btn" onclick="confirmVisitorName()" class="btn-large" style="padding: 10px 18px; min-height: 0; font-size: 20px;" disabled>これで決定</button>
             </div>
           </div>
         </div>
@@ -766,7 +784,14 @@
                       <label style="font-size: 13px; display: flex; align-items: center; gap: 4px;"><input type="checkbox" id="restriction-rule-identity-check"> 本人確認が必要（同姓・氏名指定などがある場合）</label>
                     </div>
                     <input type="text" id="restriction-rule-note" placeholder="スタッフ向けメモ（例：次男様（木村姓）のみ面会可）" style="width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: 6px; box-sizing: border-box; margin-bottom: 8px;">
-                    <button id="restriction-add-rule-btn" onclick="addRestrictionRule()" disabled style="padding: 8px 16px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">このルールを追加</button>
+                    <!-- 【不具合修正】以前はここに background-color 等を直接指定するinline styleが
+                         付いており、それがCSSの button:disabled ルールより優先されてしまうため、
+                         ①②で続柄を選ぶ前（disabled状態）でも見た目は普通に押せる緑色のボタンの
+                         ままになっていた。押しても反応がないように見え、「ボタンが押せない」という
+                         不具合として報告される原因になっていた。他の画面（これで決定ボタン等）と
+                         同じ class="btn-large" ＋ 個別のサイズ指定のみに変更し、選択前は
+                         きちんとグレーアウトして見た目でも分かるようにした。 -->
+                    <button id="restriction-add-rule-btn" onclick="addRestrictionRule()" disabled class="btn-large" style="padding: 8px 16px; min-height: 0; font-size: 16px;">このルールを追加</button>
                   </div>
                 </div>
               </div>
@@ -13405,6 +13430,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           AppState.inputBuffer = '';
           document.getElementById('staff-review-error-msg').textContent = '';
           renderStaffReviewContent();
+          // ロックアウト中に一度別画面へ移ってまた戻ってきた場合でも、残り時間の表示・
+          // 操作不可の状態を正しく引き継ぐ（openAdminLoginと同様の考え方）。
+          updateStaffReviewLockoutUI();
         }
         updateInputDisplay();
         if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete') startIdleTimer();
@@ -13590,15 +13618,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       updateAdminLockoutUI();
     }
 
-    // 管理画面ログインの暗証番号。面会制限「要確認」のスタッフ承認（screen-staff-review）でも
-    // 同じ番号・同じロックアウト状態を使い回す（スタッフしか知らない番号を2つ覚える必要をなくすため。
-    // 抜け道にならないよう、失敗回数のカウント・ロックアウトも完全に共有する＝verifyStaffPassword参照）。
+    // 管理画面ログインの暗証番号。
+    // 【セキュリティ】以前は面会制限「要確認」のスタッフ承認（screen-staff-review）でも
+    // 全く同じ番号・同じロックアウト状態を使い回していたが、あちらは来館者の目の前
+    // （受付端末の前）でスタッフが入力するため、もし来館者に見られてしまうと、同じ番号で
+    // 全患者データの閲覧・削除等ができる管理画面まで突破されるリスクがあった。
+    // 見られた場合の影響を「その場の面会1件を通すだけ」に限定するため、screen-staff-review
+    // 側は STAFF_REVIEW_PIN という別の番号・別のロックアウト状態に分離した
+    // （verifyStaffReviewPin・staffReviewAttempts参照）。
     const ADMIN_PASSWORD = '1234'; // 【要変更】仮のパスワード。実際の運用パスワードに差し替えてください
 
-    // 【共有ヘルパー】暗証番号の照合＋失敗カウント・ロックアウトの更新。
-    // 管理画面ログイン(verifyAdminPassword)・面会制限の要確認突破(confirmStaffReview)の
-    // 両方から呼ばれる。呼び出し側は戻り値の ok / locked を見て、それぞれの画面に応じた
-    // UI更新（エラーメッセージ・ロックアウト表示など）を行う。
     function verifyStaffPassword(password) {
       if (Date.now() < adminLoginAttempts.lockedUntil) return { ok: false, locked: true };
       if (password === ADMIN_PASSWORD) {
@@ -13612,6 +13641,48 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         return { ok: false, locked: true };
       }
       return { ok: false, locked: false };
+    }
+
+    // screen-staff-review（面会制限「要確認」のスタッフ承認）専用の暗証番号・ロックアウト。
+    // 管理画面ログインとは意図的に完全に独立させている（上のコメント参照）。
+    // ADMIN_PASSWORDと必ず異なる値に設定してください。
+    const STAFF_REVIEW_PIN = '5678'; // 【要変更】仮の番号。実際の運用番号（ADMIN_PASSWORDとは別の値）に差し替えてください
+    let staffReviewAttempts = { count: 0, lockedUntil: 0 };
+    let staffReviewLockoutIntervalId = null;
+
+    function verifyStaffReviewPin(pin) {
+      if (Date.now() < staffReviewAttempts.lockedUntil) return { ok: false, locked: true };
+      if (pin === STAFF_REVIEW_PIN) {
+        staffReviewAttempts = { count: 0, lockedUntil: 0 };
+        return { ok: true, locked: false };
+      }
+      staffReviewAttempts.count++;
+      if (staffReviewAttempts.count >= ADMIN_LOCKOUT_THRESHOLD) {
+        staffReviewAttempts.count = 0;
+        staffReviewAttempts.lockedUntil = Date.now() + ADMIN_LOCKOUT_MS;
+        return { ok: false, locked: true };
+      }
+      return { ok: false, locked: false };
+    }
+
+    // updateAdminLockoutUI() と同じ考え方で、screen-staff-review側のロックアウト表示
+    // （残り秒数の表示・テンキーの一時無効化）を専用に行う。
+    function updateStaffReviewLockoutUI() {
+      const remainMs = staffReviewAttempts.lockedUntil - Date.now();
+      const numpadButtons = document.querySelectorAll('#numpad-staff-review-pin button');
+      const confirmBtn = document.getElementById('staff-review-confirm-btn');
+      const errorMsg = document.getElementById('staff-review-error-msg');
+      if (remainMs > 0) {
+        numpadButtons.forEach(b => b.disabled = true);
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (errorMsg) errorMsg.textContent = `間違いが続いたため、しばらく（あと${Math.ceil(remainMs / 1000)}秒）お待ちください。`;
+        if (!staffReviewLockoutIntervalId) staffReviewLockoutIntervalId = setInterval(updateStaffReviewLockoutUI, 1000);
+      } else {
+        numpadButtons.forEach(b => b.disabled = false);
+        if (errorMsg && errorMsg.textContent.includes('お待ちください')) errorMsg.textContent = '';
+        if (staffReviewLockoutIntervalId) { clearInterval(staffReviewLockoutIntervalId); staffReviewLockoutIntervalId = null; }
+        updateInputDisplay();
+      }
     }
 
     function verifyAdminPassword() {
@@ -14983,7 +15054,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     // ============================================================
     // 管理画面：面会制限ルールの設定
     // ============================================================
-    let RestrictionModalState = { selectedPatientId: null, selectedCategoryIndex: null, selectedRelation: null };
+    // selectedRelations: { [続柄の値]: 表示ラベル } の形。複数の続柄を同時に選べるようにするため
+    // 単一の値ではなくオブジェクト（複数キーを持てる集合として使う）にしている。
+    let RestrictionModalState = { selectedPatientId: null, selectedCategoryIndex: null, selectedRelations: {} };
 
     // 【管理画面：面会制限ルールの続柄選択】来館者向け画面「患者さまとのご関係をお選びください」と
     // 同じ考え方で、まず大分類（最大12個）を選び、次にその中の詳細（最大8個程度）を選ぶ
@@ -15026,14 +15099,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       });
     }
 
+    // 選択済みボタンの見た目（色塗り）。押すたびに selected/未選択をトグルする。
+    const RESTRICTION_OPTION_BTN_BASE = 'padding: 10px 6px; border: 2px solid var(--color-border); border-radius: 6px; background: white; color: inherit; cursor: pointer; font-size: 13px; white-space: normal; line-height: 1.3;';
+    const RESTRICTION_OPTION_BTN_SELECTED = 'padding: 10px 6px; border: 2px solid var(--color-primary); border-radius: 6px; background: var(--color-primary); color: white; cursor: pointer; font-size: 13px; white-space: normal; line-height: 1.3; font-weight: 600;';
+
     function selectRestrictionCategory(idx) {
       const cat = RESTRICTION_RELATION_CATEGORIES[idx];
       RestrictionModalState.selectedCategoryIndex = idx;
-      RestrictionModalState.selectedRelation = null;
+      RestrictionModalState.selectedRelations = {};
       document.getElementById('restriction-category-view').style.display = 'none';
       document.getElementById('restriction-detail-view').style.display = 'block';
-      document.getElementById('restriction-add-rule-btn').disabled = true;
-      document.getElementById('restriction-selected-relation-display').style.display = 'none';
       document.getElementById('restriction-child-spouse-label').style.display = cat.allowSpouseCheckbox ? 'flex' : 'none';
       document.getElementById('restriction-include-child-spouse').checked = false;
       const detailButtons = document.getElementById('restriction-detail-buttons');
@@ -15041,33 +15116,56 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       if (cat.direct) {
         // 「ご家族全般」のように詳細を持たない分類は、選んだ時点で即座に続柄が確定する
         document.getElementById('restriction-detail-category-label').textContent = cat.label;
-        chooseRestrictionRelation(cat.direct, cat.label);
+        RestrictionModalState.selectedRelations[cat.direct] = cat.label;
+        updateRestrictionSelectionSummary();
         return;
       }
-      document.getElementById('restriction-detail-category-label').textContent = cat.label + ' → 詳細を選んでください';
+      // 【複数選択できるように】「長男は良いが長女はダメ」のように1件ずつ違う場合もあれば、
+      // 「長男・長女どちらも可」のようにまとめて設定したい場合もあるため、ボタンは1回押すたびに
+      // 選択・解除をトグルする方式にした（色が塗られている＝選択中）。複数選んで
+      // 「このルールを追加」を押すと、選んだ続柄それぞれについて1件ずつルールが作られる。
+      document.getElementById('restriction-detail-category-label').textContent = cat.label + ' → 詳細を選んでください（複数選択できます）';
       cat.options.forEach(opt => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = opt.l;
-        btn.style.cssText = 'padding: 10px 6px; border: 1px solid var(--color-border); border-radius: 6px; background: white; cursor: pointer; font-size: 13px; white-space: normal; line-height: 1.3;';
-        btn.onclick = () => chooseRestrictionRelation(opt.v, opt.l);
+        btn.style.cssText = RESTRICTION_OPTION_BTN_BASE;
+        btn.onclick = () => toggleRestrictionRelation(opt.v, opt.l, btn);
         detailButtons.appendChild(btn);
       });
+      updateRestrictionSelectionSummary();
     }
 
-    function chooseRestrictionRelation(value, label) {
-      RestrictionModalState.selectedRelation = value;
+    function toggleRestrictionRelation(value, label, btn) {
+      if (RestrictionModalState.selectedRelations[value]) {
+        delete RestrictionModalState.selectedRelations[value];
+        btn.style.cssText = RESTRICTION_OPTION_BTN_BASE;
+      } else {
+        RestrictionModalState.selectedRelations[value] = label;
+        btn.style.cssText = RESTRICTION_OPTION_BTN_SELECTED;
+      }
+      updateRestrictionSelectionSummary();
+    }
+
+    function updateRestrictionSelectionSummary() {
       const disp = document.getElementById('restriction-selected-relation-display');
-      disp.style.display = 'block';
-      disp.textContent = '選択中のご関係：' + label;
-      document.getElementById('restriction-add-rule-btn').disabled = false;
+      const addBtn = document.getElementById('restriction-add-rule-btn');
+      const labels = Object.values(RestrictionModalState.selectedRelations);
+      if (labels.length === 0) {
+        disp.style.display = 'none';
+        addBtn.disabled = true;
+      } else {
+        disp.style.display = 'block';
+        disp.textContent = `選択中のご関係（${labels.length}件）：` + labels.join('、');
+        addBtn.disabled = false;
+      }
     }
 
     function backToRestrictionCategory() {
       document.getElementById('restriction-category-view').style.display = 'block';
       document.getElementById('restriction-detail-view').style.display = 'none';
       RestrictionModalState.selectedCategoryIndex = null;
-      RestrictionModalState.selectedRelation = null;
+      RestrictionModalState.selectedRelations = {};
     }
 
     function openRestrictionRulesModal() {
@@ -15183,9 +15281,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       const master = fetchPatientMaster();
       const patient = getSelectedRestrictionPatient(master);
       if (!patient) return;
-      const relation = RestrictionModalState.selectedRelation;
-      if (!relation) {
-        alert('①でご関係を選択してください。');
+      const selectedValues = Object.keys(RestrictionModalState.selectedRelations);
+      if (selectedValues.length === 0) {
+        alert('①②でご関係を選択してください。');
         return;
       }
       const requiresIdentityCheck = document.getElementById('restriction-rule-identity-check').checked;
@@ -15195,16 +15293,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         return;
       }
       if (!patient.restrictionRules) patient.restrictionRules = [];
-      // 追加するご関係のリスト。「子」の分類で「配偶者も含める」にチェックが入っている場合は、
-      // 「息子の嫁」「娘の婿」を別々のルールとして併せて登録する（判定ロジック上は今まで通り、
-      // 血縁の子と、その配偶者とを別のルールとして扱う設計を維持している）。
-      const relationsToAdd = [relation];
+      // 追加するご関係のリスト。②で複数選んでいれば（例：長男・長女どちらも）その全件を追加する。
+      // 「子」の分類で「配偶者も含める」にチェックが入っている場合は、選んだ続柄それぞれに応じて
+      // 「息子の嫁」「娘の婿」も別々のルールとして併せて登録する（判定ロジック上は今まで通り、
+      // 血縁の子と、その配偶者とを別のルールとして扱う設計を維持している。重複追加は防止する）。
+      const relationsToAdd = [...selectedValues];
       const cat = RESTRICTION_RELATION_CATEGORIES[RestrictionModalState.selectedCategoryIndex];
       if (cat && cat.allowSpouseCheckbox && document.getElementById('restriction-include-child-spouse').checked) {
         const sonRelations = ['子', '長男', '次男', '三男以降'];
         const daughterRelations = ['子', '長女', '次女', '三女以降'];
-        if (sonRelations.includes(relation)) relationsToAdd.push('息子の嫁');
-        if (daughterRelations.includes(relation)) relationsToAdd.push('娘の婿');
+        selectedValues.forEach(relation => {
+          if (sonRelations.includes(relation) && !relationsToAdd.includes('息子の嫁')) relationsToAdd.push('息子の嫁');
+          if (daughterRelations.includes(relation) && !relationsToAdd.includes('娘の婿')) relationsToAdd.push('娘の婿');
+        });
       }
       relationsToAdd.forEach(r => {
         patient.restrictionRules.push({
@@ -15499,15 +15600,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       AppState.idleTimerId = setTimeout(() => { goTop(); }, timeout);
     }
 
-    // 【不具合修正】screen-blocked（面会禁止でお引き止めした画面）では「15秒後に自動で戻ります」
-    // と表示しているが、その15秒のタイマーは startBlockedTimer() で個別にセットしていた一方、
-    // 画面のどこかをタップするたびに呼ばれるこの resetIdleTimer() は常に startIdleTimer()（既定3分）
-    // を呼んでいたため、待っている間に画面のどこかに触れるたびに15秒のはずが3分に延びてしまい、
-    // 実質「自動で戻らない」ように見える不具合があった。screen-blocked にいる間だけは
-    // startBlockedTimer() を呼び直すようにして、タップしても15秒のまま保たれるようにする。
+    // 【不具合修正】screen-blocked（面会禁止でお引き止めした画面。「15秒後に自動で戻ります」）や
+    // screen-complete（面会証発行後の完了画面。「20秒後に自動で最初の画面に戻ります」）などは、
+    // 画面に入った時点でそれぞれ専用のタイマー（startBlockedTimer・startCompleteTimer等）を
+    // 個別にセットしている。一方で、画面のどこかをタップするたびに呼ばれるこの resetIdleTimer()が
+    // 専用タイマーの存在を考慮せず常に startIdleTimer()（既定3分。screen-completeなら90秒）を
+    // 呼んでいたため、表示している秒数（15秒・20秒等）より実際にはずっと長く待たされてしまい、
+    // 「戻ると書いてあるのに戻らない」ように見える不具合があった
+    // （例：面会証発行後の画面で「面会証を印刷する」をタップすると、20秒のはずが90秒に延びる）。
+    // 専用タイマーを持つ画面ではその専用タイマーを呼び直し、表示している秒数からずれないようにする。
     function resetIdleTimer() {
       if (AppState.currentScreen === 'screen-blocked') {
         startBlockedTimer();
+        return;
+      }
+      if (AppState.currentScreen === 'screen-complete') {
+        startCompleteTimer();
+        return;
+      }
+      if (AppState.currentScreen === 'screen-checkout' && AppState.checkoutSucceeded) {
+        startCheckoutResultTimer();
         return;
       }
       startIdleTimer();
@@ -15917,11 +16029,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     }
 
     function confirmStaffReview() {
-      if (Date.now() < adminLoginAttempts.lockedUntil) {
-        document.getElementById('staff-review-error-msg').textContent = '間違いが続いたため、しばらくお待ちください（管理画面ログインと共通のロックアウトです）。';
+      if (Date.now() < staffReviewAttempts.lockedUntil) {
+        updateStaffReviewLockoutUI();
         return;
       }
-      const result = verifyStaffPassword(AppState.inputBuffer);
+      const result = verifyStaffReviewPin(AppState.inputBuffer);
       AppState.inputBuffer = '';
       updateInputDisplay();
       if (result.ok) {
@@ -15930,7 +16042,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         return;
       }
       if (result.locked) {
-        document.getElementById('staff-review-error-msg').textContent = '間違いが続いたため、しばらくお待ちください（管理画面ログインと共通のロックアウトです）。';
+        updateStaffReviewLockoutUI();
       } else {
         document.getElementById('staff-review-error-msg').textContent = '暗証番号が正しくありません';
       }
