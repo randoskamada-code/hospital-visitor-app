@@ -570,10 +570,14 @@
       <section class="screen" id="screen-admin-login">
         <button class="back-button" onclick="goTop()">← 戻る</button>
         <div class="screen-content">
-          <div style="font-size: var(--fs-lg); margin-bottom: 30px; font-weight: 600;">管理画面ログイン</div>
+          <div style="font-size: var(--fs-lg); margin-bottom: 20px; font-weight: 600;">管理画面ログイン</div>
           <div style="width: 80%; max-width: 400px;">
-            <input type="password" id="admin-password" placeholder="パスワードを入力" style="width: 100%; padding: 16px; font-size: var(--fs-md); border: var(--border-w) solid var(--color-border); border-radius: var(--radius); font-family: inherit; margin-bottom: 20px;">
-            <button class="btn-large" onclick="verifyAdminPassword()" style="width: 100%;">ログイン</button>
+            <!-- OSの標準キーボードが立ち上がって画面が狭くなるのを避けるため、input要素ではなく
+                 他画面（部屋番号・電話番号など）と同じ自前のテンキーで入力する。
+                 入力内容はパスワードなので画面には数字そのものではなく●で表示する。 -->
+            <div class="input-display" id="admin-password-display">-</div>
+            <div class="numpad-container" id="numpad-admin-password" style="margin: 15px 0;"></div>
+            <button class="btn-large" id="admin-login-btn" onclick="verifyAdminPassword()" style="width: 100%;" disabled>ログイン</button>
           </div>
           <div id="admin-error-msg" style="color: var(--color-alert); font-size: var(--fs-xs); margin-top: 15px; text-align: center;"></div>
         </div>
@@ -13389,16 +13393,56 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       showScreen('screen-checkout');
     }
 
+    // 【誤操作対策その2：連続失敗ロックアウト】
+    // 管理画面には面会者・患者様に関わる個人情報（氏名・部屋番号・電話番号・署名）が
+    // 含まれるため、総当たりでパスワードを推測されるリスクを下げる目的で、規定回数
+    // 連続して間違えると一定時間ログインボタン・テンキーを操作できなくする。
+    // この状態は画面遷移をまたいでも保持する必要がある（一度TOPに戻ってまた開き直せば
+    // ロックアウトが解除できてしまっては意味がないため）ため、モジュール変数で保持する
+    // （ページを再読み込みすればリセットされるが、それはキオスク運用上まれなケースであり、
+    // 現状の他の状態（署名Canvasの初期化状態等）と同様の割り切りとする）。
+    const ADMIN_LOCKOUT_THRESHOLD = 5; // 連続何回間違えたらロックするか
+    const ADMIN_LOCKOUT_MS = 30000;    // ロックする時間（30秒）
+    let adminLoginAttempts = { count: 0, lockedUntil: 0 };
+    let adminLockoutIntervalId = null;
+
+    function updateAdminLockoutUI() {
+      const remainMs = adminLoginAttempts.lockedUntil - Date.now();
+      const numpadButtons = document.querySelectorAll('#numpad-admin-password button');
+      const loginBtn = document.getElementById('admin-login-btn');
+      const errorMsg = document.getElementById('admin-error-msg');
+      if (remainMs > 0) {
+        numpadButtons.forEach(b => b.disabled = true);
+        if (loginBtn) loginBtn.disabled = true;
+        if (errorMsg) errorMsg.textContent = `間違いが続いたため、しばらく（あと${Math.ceil(remainMs / 1000)}秒）お待ちください。`;
+        if (!adminLockoutIntervalId) adminLockoutIntervalId = setInterval(updateAdminLockoutUI, 1000);
+      } else {
+        numpadButtons.forEach(b => b.disabled = false);
+        if (errorMsg && errorMsg.textContent.includes('お待ちください')) errorMsg.textContent = '';
+        if (adminLockoutIntervalId) { clearInterval(adminLockoutIntervalId); adminLockoutIntervalId = null; }
+        // ロック解除直後は、テンキー入力内容に応じたログインボタンの有効/無効を再計算する。
+        updateInputDisplay();
+      }
+    }
+
     function openAdminLogin() {
-      document.getElementById('admin-password').value = '';
+      AppState.inputBuffer = '';
       document.getElementById('admin-error-msg').textContent = '';
       showScreen('screen-admin-login');
+      // ロックアウト中に一度TOPへ戻ってまた開き直した場合でも、残り時間の表示・
+      // 操作不可の状態を正しく引き継ぐ。
+      updateAdminLockoutUI();
     }
 
     function verifyAdminPassword() {
-      const password = document.getElementById('admin-password').value;
-      const correctPassword = '1234'; // 仮のパスワード
+      if (Date.now() < adminLoginAttempts.lockedUntil) {
+        updateAdminLockoutUI();
+        return;
+      }
+      const password = AppState.inputBuffer;
+      const correctPassword = '1234'; // 【要変更】仮のパスワード。実際の運用パスワードに差し替えてください
       if (password === correctPassword) {
+        adminLoginAttempts = { count: 0, lockedUntil: 0 };
         // ログインするたびに「🗑 削除済みを表示」はOFFの状態から始める
         // （🔄 更新ボタンでは表示モードを維持したいので、リセットはここだけで行う）。
         AdminViewState.showDeleted = false;
@@ -13408,7 +13452,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         loadAdminDashboard();
         showScreen('screen-admin-dashboard');
       } else {
-        document.getElementById('admin-error-msg').textContent = 'パスワードが正しくありません';
+        adminLoginAttempts.count++;
+        AppState.inputBuffer = '';
+        updateInputDisplay();
+        if (adminLoginAttempts.count >= ADMIN_LOCKOUT_THRESHOLD) {
+          adminLoginAttempts.count = 0;
+          adminLoginAttempts.lockedUntil = Date.now() + ADMIN_LOCKOUT_MS;
+          updateAdminLockoutUI();
+        } else {
+          document.getElementById('admin-error-msg').textContent = 'パスワードが正しくありません';
+        }
       }
     }
 
@@ -13982,6 +14035,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           if (AppState.inputBuffer.length < 9) AppState.inputBuffer += char;
         } else if (cur === 'screen-kana') {
           if (AppState.kanaBuffer.length < 6) AppState.kanaBuffer += char;
+        } else if (cur === 'screen-admin-login') {
+          // 現在のパスワードは4桁だが、将来桁数を変更しても打ち直しにならないよう
+          // 余裕を持たせて8桁まで入力できるようにしておく。
+          if (AppState.inputBuffer.length < 8) AppState.inputBuffer += char;
         }
       }
       updateInputDisplay();
@@ -14014,6 +14071,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const btn = document.getElementById('checkout-manual-submit-btn');
         if (display) display.textContent = AppState.inputBuffer || '-';
         if (btn) btn.disabled = AppState.inputBuffer.length !== 9;
+      } else if (AppState.currentScreen === 'screen-admin-login') {
+        // パスワードなので数字そのものは表示せず、●（入力した桁数分）で表示する。
+        const display = document.getElementById('admin-password-display');
+        const btn = document.getElementById('admin-login-btn');
+        if (display) display.textContent = AppState.inputBuffer ? '●'.repeat(AppState.inputBuffer.length) : '-';
+        if (btn) btn.disabled = AppState.inputBuffer.length === 0;
       }
     }
 
@@ -14823,6 +14886,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 画面に表示され続ける。画面のどこかをタップするたびに呼ばれる resetIdleTimer()が
         // ここを通っても通常の180秒（3分）まで延びてしまわないよう、短めの時間に留める。
         timeout = 15000;
+      } else if (AppState.currentScreen === 'screen-admin-dashboard') {
+        // 【スタッフの利便性】管理画面は面会者からの急な照会にすぐ対応できるよう、
+        // 開いたままにしておきたいという運用要望がある。通常の3分では少し目を離した
+        // だけで戻されてしまい不便なため、ここだけ15分に延長する。ただし完全に無くすと
+        // 本当に離籍したまま忘れた場合の安全網が無くなってしまうため、時間を延ばすに
+        // とどめている（離籍時は画面OFFを推奨。それでも画面をONに戻せば再ログイン無しで
+        // 見えてしまう点はこのタイムアウトが最後の砦になる）。
+        timeout = 900000;
       }
       AppState.idleTimerId = setTimeout(() => { goTop(); }, timeout);
     }
@@ -15365,6 +15436,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       renderNumpad('numpad-phone');
       renderNumpad('numpad-repeat-phone');
       renderNumpad('numpad-checkout');
+      renderNumpad('numpad-admin-password');
       renderKanaKeyboard();
 
       // SVG ノードにクリックイベントを設定
