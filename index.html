@@ -303,6 +303,25 @@
         </div>
       </section>
 
+      <!-- 面会制限ルールの「要スタッフ確認」判定になった場合の画面。
+           自動での可否判定ができない条件（同姓のみ・特定のお名前のみ等）に該当した際、
+           来館者が最終判断するのではなく、スタッフが内容を見て暗証番号で許可する。
+           拒否（お引き取りいただく）は暗証番号なしでも行える（既定は不許可のため）。 -->
+      <section class="screen" id="screen-staff-review">
+        <div class="screen-content">
+          <div class="warning-icon" style="color: #E8A33D;">🔔</div>
+          <div style="font-size: var(--fs-md); font-weight: 600; margin: 15px 0; text-align: center;">スタッフの確認をお願いします</div>
+          <div id="staff-review-content" class="confirm-card" style="text-align: left; width: 100%; max-width: 500px;"></div>
+          <div class="input-display" id="staff-review-pin-display" style="margin-top: 15px;">-</div>
+          <div class="numpad-container" id="numpad-staff-review-pin" style="margin: 15px 0;"></div>
+          <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+            <button class="btn-large" style="background-color: white; color: var(--color-alert); border: 2px solid var(--color-alert);" onclick="denyStaffReview()">許可しない（お引き取りいただく）</button>
+            <button class="btn-large" id="staff-review-confirm-btn" onclick="confirmStaffReview()" disabled>暗証番号を入力して許可する</button>
+          </div>
+          <div id="staff-review-error-msg" style="color: var(--color-alert); font-size: var(--fs-sm); margin-top: 10px; text-align: center;"></div>
+        </div>
+      </section>
+
       <!-- チェックアウト画面 -->
       <section class="screen" id="screen-checkout">
         <button class="back-button" onclick="goTop()">← 最初に戻る</button>
@@ -480,6 +499,22 @@
             </div>
           </div>
         </div>
+        <!-- 面会制限ルールのある患者様の面会でのみ表示：来館者ご本人のお名前（かな）を入力する
+             ミニキーボード。screen-relation に入った時点で自動的に開く（showScreen参照）。
+             evaluateVisitRestriction() での判定・screen-staff-reviewでのスタッフ確認に使う。 -->
+        <div id="visitor-name-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1002; justify-content: center; align-items: center;">
+          <div style="background: white; padding: 30px; border-radius: 16px; text-align: center; max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <div style="font-size: var(--fs-lg); font-weight: 600; margin-bottom: 10px;">恐れ入りますが、ご来館者様のお名前をご入力ください</div>
+            <div style="font-size: var(--fs-sm); color: var(--color-text-sub); margin-bottom: 15px;">こちらの患者様は面会に条件がございます。確認のためご協力をお願いいたします。</div>
+            <div class="input-display" id="visitor-name-display">-</div>
+            <div id="visitor-name-keyboard" style="margin-top: 15px;"></div>
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+              <button onclick="backspaceVisitorName()" style="padding: 12px 20px; background: #ccc; border: none; border-radius: 8px; font-size: var(--fs-md); cursor: pointer;">1文字削除</button>
+              <button onclick="goTop()" style="padding: 12px 20px; background: #999; color: white; border: none; border-radius: 8px; font-size: var(--fs-md); cursor: pointer;">やめて最初に戻る</button>
+              <button id="visitor-name-confirm-btn" onclick="confirmVisitorName()" class="btn-large" disabled>これで決定</button>
+            </div>
+          </div>
+        </div>
         <div id="relation-selected" style="text-align: center; margin-top: 20px; font-size: var(--fs-lg); font-weight: 600; color: var(--color-primary); min-height: 40px;">
         </div>
         <div style="text-align: center; margin-top: 20px;">
@@ -531,7 +566,7 @@
           <div id="repeat-transfer-note" class="help-text" style="color: var(--color-alert);"></div>
           <div class="two-button-row">
             <button class="btn-confirm" onclick="showScreen('screen-sign')">書き直す</button>
-            <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="showScreen('screen-count')">このまま進む</button>
+            <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="proceedRepeatVisit()">このまま進む</button>
           </div>
         </div>
         <button class="reset-button" onclick="goTop()">最初に戻る</button>
@@ -606,6 +641,7 @@
             <button onclick="applyAdminFilters()" class="admin-filter-search-btn">検索</button>
             <button onclick="toggleAdminTrashView()" class="admin-backup-btn" id="admin-trash-toggle-btn" style="border-color: #999; color: #666;">🗑 削除済みを表示</button>
             <button onclick="openBlockedAttemptsModal()" class="admin-backup-btn" id="admin-blocked-attempts-btn" style="border-color: var(--color-alert); color: var(--color-alert);">🚫 面会禁止の試行履歴</button>
+            <button onclick="openRestrictionRulesModal()" class="admin-backup-btn" id="admin-restriction-rules-btn" style="border-color: #8e44ad; color: #8e44ad;">🔒 面会制限の設定</button>
             <button onclick="downloadVisitLogBackup()" class="admin-backup-btn" id="admin-backup-btn">💾 バックアップを保存</button>
           </div>
           <div style="text-align: center; font-size: 11px; color: var(--color-text-sub); margin-top: -10px; margin-bottom: 16px;" id="admin-backup-help">
@@ -670,6 +706,92 @@
               <div style="display: flex; gap: 10px; margin-top: 15px; justify-content: center;">
                 <button onclick="clearBlockedAttemptsLog()" style="padding: 10px 20px; background-color: white; color: var(--color-alert); border: 1px solid var(--color-alert); border-radius: 6px; cursor: pointer; font-weight: 600;">記録を全て消去</button>
                 <button onclick="closeBlockedAttemptsModal()" style="padding: 10px 20px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">閉じる</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 面会制限ルールの設定モーダル -->
+          <!-- 【目的】患者様ごとに「どの続柄なら面会できるか」を設定する。CSV自動取り込みでは
+               この内容は一切変更されない（看護師からの連絡を受けて、その都度ここで設定する運用）。 -->
+          <div id="restriction-rules-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center;">
+            <div style="background: white; padding: 20px; border-radius: 8px; max-width: 700px; width: 90%; max-height: 85vh; display: flex; flex-direction: column;">
+              <div style="font-size: var(--fs-md); font-weight: 600; margin-bottom: 5px;">面会制限の設定</div>
+              <div style="font-size: 12px; color: var(--color-text-sub); margin-bottom: 15px;">部屋番号または患者氏名（カナ）で検索し、面会を許可する続柄などのルールを設定できます。CSV取り込みではこの設定は変更されません。</div>
+
+              <div id="restriction-search-view">
+                <input type="text" id="restriction-search-input" placeholder="部屋番号または患者氏名（カナ）で検索" style="width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: 6px; box-sizing: border-box; margin-bottom: 12px;" oninput="renderRestrictionSearchResults()">
+                <div id="restriction-search-results" style="overflow-y: auto; max-height: 45vh; border: 1px solid var(--color-border); border-radius: 6px;"></div>
+              </div>
+
+              <div id="restriction-edit-view" style="display: none; overflow-y: auto;">
+                <button onclick="backToRestrictionSearch()" style="margin-bottom: 10px; padding: 6px 12px; background: #eee; border: none; border-radius: 6px; cursor: pointer;">← 検索に戻る</button>
+                <div id="restriction-edit-patient-header" style="font-weight: 600; margin-bottom: 10px;"></div>
+                <div id="restriction-edit-status" style="margin-bottom: 10px; padding: 10px; background: #f5f5f5; border-radius: 6px; font-size: 13px;"></div>
+                <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+                  <button onclick="setBlanketRestriction()" style="padding: 8px 14px; background: white; color: var(--color-alert); border: 1px solid var(--color-alert); border-radius: 6px; cursor: pointer; font-weight: 600;">🚫 面会を全面禁止にする（例外なし）</button>
+                  <button onclick="clearAllRestriction()" style="padding: 8px 14px; background: white; color: var(--color-primary); border: 1px solid var(--color-primary); border-radius: 6px; cursor: pointer; font-weight: 600;">✅ 面会制限を解除する</button>
+                </div>
+                <div id="restriction-rules-list" style="margin-bottom: 15px;"></div>
+                <div style="border-top: 1px solid var(--color-border); padding-top: 12px;">
+                  <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">＋ 許可ルールを追加</div>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
+                    <select id="restriction-rule-relation" style="padding: 6px; border: 1px solid var(--color-border); border-radius: 6px;">
+                      <option value="ANY_FAMILY">ご家族全般（続柄を問わず）</option>
+                      <option value="夫">夫</option>
+                      <option value="妻">妻</option>
+                      <option value="父">父</option>
+                      <option value="母">母</option>
+                      <option value="子">子（長男・次男等を問わず）</option>
+                      <option value="長男">長男</option>
+                      <option value="次男">次男</option>
+                      <option value="三男以降">三男以降</option>
+                      <option value="長女">長女</option>
+                      <option value="次女">次女</option>
+                      <option value="三女以降">三女以降</option>
+                      <option value="孫">孫</option>
+                      <option value="ひ孫">ひ孫</option>
+                      <option value="兄">兄</option>
+                      <option value="弟">弟</option>
+                      <option value="姉">姉</option>
+                      <option value="妹">妹</option>
+                      <option value="甥">甥</option>
+                      <option value="姪">姪</option>
+                      <option value="義父">義父（配偶者の父）</option>
+                      <option value="義母">義母（配偶者の母）</option>
+                      <option value="義兄">義兄</option>
+                      <option value="義姉">義姉</option>
+                      <option value="義弟">義弟</option>
+                      <option value="義妹">義妹</option>
+                      <option value="父方の祖父">父方の祖父</option>
+                      <option value="父方の祖母">父方の祖母</option>
+                      <option value="父方の伯父">父方の伯父</option>
+                      <option value="父方の叔父">父方の叔父</option>
+                      <option value="父方の伯母">父方の伯母</option>
+                      <option value="父方の叔母">父方の叔母</option>
+                      <option value="父方の従兄弟">父方の従兄弟</option>
+                      <option value="父方の従姉妹">父方の従姉妹</option>
+                      <option value="母方の祖父">母方の祖父</option>
+                      <option value="母方の祖母">母方の祖母</option>
+                      <option value="母方の伯父">母方の伯父</option>
+                      <option value="母方の叔父">母方の叔父</option>
+                      <option value="母方の伯母">母方の伯母</option>
+                      <option value="母方の叔母">母方の叔母</option>
+                      <option value="母方の従兄弟">母方の従兄弟</option>
+                      <option value="母方の従姉妹">母方の従姉妹</option>
+                      <option value="後見人">後見人</option>
+                      <option value="友人・知人">友人・知人</option>
+                      <option value="職場関係者">職場関係者</option>
+                      <option value="ケアマネジャー・施設関係者">ケアマネジャー・施設関係者</option>
+                    </select>
+                    <label style="font-size: 13px; display: flex; align-items: center; gap: 4px;"><input type="checkbox" id="restriction-rule-identity-check"> 本人確認が必要（同姓・氏名指定などがある場合）</label>
+                  </div>
+                  <input type="text" id="restriction-rule-note" placeholder="スタッフ向けメモ（例：次男様（木村姓）のみ面会可）" style="width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: 6px; box-sizing: border-box; margin-bottom: 8px;">
+                  <button onclick="addRestrictionRule()" style="padding: 8px 16px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">このルールを追加</button>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 15px; justify-content: center;">
+                <button onclick="closeRestrictionRulesModal()" style="padding: 10px 20px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">閉じる</button>
               </div>
             </div>
           </div>
@@ -13150,27 +13272,45 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       REVERSE_SMALL_KANA_MAP[SMALL_KANA_MAP[base]] = base;
     }
 
+    // 【restrictionRules について】面会制限のある患者様のうち、続柄によって一部の方だけ面会を
+    // 許可したい場合に、この配列にルールを追加する（管理画面「🔒 面会制限の設定」から編集可能）。
+    // 各ルールは { relation, requiresIdentityCheck, note } の形。
+    //   relation: 許可する続柄（'妻'などの具体的な値、または「子」全般を指す'子'、
+    //             ご家族全般を指す特別な値'ANY_FAMILY'のいずれか）
+    //   requiresIdentityCheck: true にすると、続柄が一致してもキオスクは自動的に許可せず、
+    //             「要スタッフ確認」画面へ回す（同姓・お名前の指定などがある場合はtrueにする）
+    //   note: スタッフ向けの条件の説明文（screen-staff-review・試行履歴に表示される）
+    // restrictionRules が空配列（[]）の場合は、従来通り「例外なしの全面面会禁止」として扱われる。
     const SEED_PATIENT_MASTER = [
-      { patientId: "P0001", roomNo: "301", lastNameKana: "やまだ", firstNameKana: "たろう", lastNameKanji: "山田", firstNameKanji: "太郎", initial: "T.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0002", roomNo: "301", lastNameKana: "さとう", firstNameKana: "はなこ", lastNameKanji: "佐藤", firstNameKanji: "花子", initial: "H.S.", restricted: false, restrictReason: "" },
-      { patientId: "P0003", roomNo: "302", lastNameKana: "すずき", firstNameKana: "いちろう", lastNameKanji: "鈴木", firstNameKanji: "一郎", initial: "I.S.", restricted: true, restrictReason: "面会禁止" },
-      { patientId: "P0004", roomNo: "302", lastNameKana: "たなか", firstNameKana: "よしお", lastNameKanji: "田中", firstNameKanji: "吉男", initial: "Y.T.", restricted: false, restrictReason: "" },
-      { patientId: "P0005", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "じろう", lastNameKanji: "山田", firstNameKanji: "次郎", initial: "J.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0006", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "さぶろう", lastNameKanji: "山田", firstNameKanji: "三郎", initial: "S.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0007", roomNo: "303", lastNameKana: "こばやし", firstNameKana: "みつこ", lastNameKanji: "小林", firstNameKanji: "光子", initial: "M.K.", restricted: false, restrictReason: "" },
-      { patientId: "P0008", roomNo: "401", lastNameKana: "わたなべ", firstNameKana: "けんじ", lastNameKanji: "渡辺", firstNameKanji: "健二", initial: "K.W.", restricted: false, restrictReason: "" },
-      { patientId: "P0009", roomNo: "401", lastNameKana: "いとう", firstNameKana: "あきこ", lastNameKanji: "伊藤", firstNameKanji: "秋子", initial: "A.I.", restricted: true, restrictReason: "面会禁止" },
-      { patientId: "P0010", roomNo: "402", lastNameKana: "なかむら", firstNameKana: "しげる", lastNameKanji: "中村", firstNameKanji: "茂", initial: "S.N.", restricted: false, restrictReason: "" },
-      { patientId: "P0011", roomNo: "402", lastNameKana: "やまもと", firstNameKana: "ふみえ", lastNameKanji: "山本", firstNameKanji: "文恵", initial: "F.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0012", roomNo: "403", lastNameKana: "かとう", firstNameKana: "まさし", lastNameKanji: "加藤", firstNameKanji: "正", initial: "M.K.", restricted: false, restrictReason: "" },
-      { patientId: "P0013", roomNo: "403", lastNameKana: "よしだ", firstNameKana: "のぶお", lastNameKanji: "吉田", firstNameKanji: "信夫", initial: "N.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0014", roomNo: "501", lastNameKana: "ささき", firstNameKana: "ともこ", lastNameKanji: "佐々木", firstNameKanji: "朋子", initial: "T.S.", restricted: false, restrictReason: "" },
-      { patientId: "P0015", roomNo: "501", lastNameKana: "やまぐち", firstNameKana: "たけし", lastNameKanji: "山口", firstNameKanji: "武", initial: "T.Y.", restricted: false, restrictReason: "" },
-      { patientId: "P0016", roomNo: "502", lastNameKana: "まつもと", firstNameKana: "きよし", lastNameKanji: "松本", firstNameKanji: "清", initial: "K.M.", restricted: false, restrictReason: "" },
-      { patientId: "P0017", roomNo: "502", lastNameKana: "いのうえ", firstNameKana: "みどり", lastNameKanji: "井上", firstNameKanji: "緑", initial: "M.I.", restricted: false, restrictReason: "" },
-      { patientId: "P0018", roomNo: "503", lastNameKana: "きむら", firstNameKana: "ひろし", lastNameKanji: "木村", firstNameKanji: "寛", initial: "H.K.", restricted: true, restrictReason: "面会禁止" },
-      { patientId: "P0019", roomNo: "503", lastNameKana: "はやし", firstNameKana: "かずえ", lastNameKanji: "林", firstNameKanji: "和枝", initial: "K.H.", restricted: false, restrictReason: "" },
-      { patientId: "P0020", roomNo: "503", lastNameKana: "しみず", firstNameKana: "ゆうじ", lastNameKanji: "清水", firstNameKanji: "勇治", initial: "Y.S.", restricted: false, restrictReason: "" }
+      { patientId: "P0001", roomNo: "301", lastNameKana: "やまだ", firstNameKana: "たろう", lastNameKanji: "山田", firstNameKanji: "太郎", initial: "T.Y.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0002", roomNo: "301", lastNameKana: "さとう", firstNameKana: "はなこ", lastNameKanji: "佐藤", firstNameKanji: "花子", initial: "H.S.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0003", roomNo: "302", lastNameKana: "すずき", firstNameKana: "いちろう", lastNameKanji: "鈴木", firstNameKanji: "一郎", initial: "I.S.", restricted: true, restrictReason: "面会禁止", restrictionRules: [] },
+      { patientId: "P0004", roomNo: "302", lastNameKana: "たなか", firstNameKana: "よしお", lastNameKanji: "田中", firstNameKanji: "吉男", initial: "Y.T.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0005", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "じろう", lastNameKanji: "山田", firstNameKanji: "次郎", initial: "J.Y.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0006", roomNo: "303", lastNameKana: "やまだ", firstNameKana: "さぶろう", lastNameKanji: "山田", firstNameKanji: "三郎", initial: "S.Y.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0007", roomNo: "303", lastNameKana: "こばやし", firstNameKana: "みつこ", lastNameKanji: "小林", firstNameKanji: "光子", initial: "M.K.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0008", roomNo: "401", lastNameKana: "わたなべ", firstNameKana: "けんじ", lastNameKanji: "渡辺", firstNameKanji: "健二", initial: "K.W.", restricted: false, restrictReason: "", restrictionRules: [] },
+      // 【デモ用】「ご家族のみ面会可」の例：続柄が家族カテゴリならスタッフ確認なしで自動的に許可、
+      // 友人・知人等の家族以外は自動的にブロックする。
+      { patientId: "P0009", roomNo: "401", lastNameKana: "いとう", firstNameKana: "あきこ", lastNameKanji: "伊藤", firstNameKanji: "秋子", initial: "A.I.", restricted: true, restrictReason: "ご家族のみ面会可", restrictionRules: [
+        { id: 'seed-r1', relation: 'ANY_FAMILY', requiresIdentityCheck: false, note: 'ご家族のみ面会可（友人・知人等は不可）' }
+      ] },
+      { patientId: "P0010", roomNo: "402", lastNameKana: "なかむら", firstNameKana: "しげる", lastNameKanji: "中村", firstNameKanji: "茂", initial: "S.N.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0011", roomNo: "402", lastNameKana: "やまもと", firstNameKana: "ふみえ", lastNameKanji: "山本", firstNameKanji: "文恵", initial: "F.Y.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0012", roomNo: "403", lastNameKana: "かとう", firstNameKana: "まさし", lastNameKanji: "加藤", firstNameKanji: "正", initial: "M.K.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0013", roomNo: "403", lastNameKana: "よしだ", firstNameKana: "のぶお", lastNameKanji: "吉田", firstNameKanji: "信夫", initial: "N.Y.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0014", roomNo: "501", lastNameKana: "ささき", firstNameKana: "ともこ", lastNameKanji: "佐々木", firstNameKanji: "朋子", initial: "T.S.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0015", roomNo: "501", lastNameKana: "やまぐち", firstNameKana: "たけし", lastNameKanji: "山口", firstNameKanji: "武", initial: "T.Y.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0016", roomNo: "502", lastNameKana: "まつもと", firstNameKana: "きよし", lastNameKanji: "松本", firstNameKanji: "清", initial: "K.M.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0017", roomNo: "502", lastNameKana: "いのうえ", firstNameKana: "みどり", lastNameKanji: "井上", firstNameKanji: "緑", initial: "M.I.", restricted: false, restrictReason: "", restrictionRules: [] },
+      // 【デモ用】「次男（同姓）のみ面会可、その他の親族は不可」の例：続柄が「子」で、その中でも
+      // 「次男」を選んだ場合のみ要スタッフ確認（同姓の判定は自動ではできないため）。
+      // それ以外の続柄（長男・妻・友人等）は自動的にブロックする。
+      { patientId: "P0018", roomNo: "503", lastNameKana: "きむら", firstNameKana: "ひろし", lastNameKanji: "木村", firstNameKanji: "寛", initial: "H.K.", restricted: true, restrictReason: "次男様（木村姓）のみ面会可", restrictionRules: [
+        { id: 'seed-r2', relation: '次男', requiresIdentityCheck: true, note: '次男様（木村姓）のみ面会可。ご本人確認をお願いします。' }
+      ] },
+      { patientId: "P0019", roomNo: "503", lastNameKana: "はやし", firstNameKana: "かずえ", lastNameKanji: "林", firstNameKanji: "和枝", initial: "K.H.", restricted: false, restrictReason: "", restrictionRules: [] },
+      { patientId: "P0020", roomNo: "503", lastNameKana: "しみず", firstNameKana: "ゆうじ", lastNameKanji: "清水", firstNameKanji: "勇治", initial: "Y.S.", restricted: false, restrictReason: "", restrictionRules: [] }
     ];
 
     let AppState = {
@@ -13189,7 +13329,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       entryType: null,
       lastVisitRecord: null,
       idleTimerId: null,
-      checkoutSucceeded: false
+      checkoutSucceeded: false,
+      // 面会制限ルール（restrictionRules）のある患者様の面会でのみ使う項目。
+      visitorName: '',       // 来館者ご本人のお名前（かな）。screen-staff-reviewでスタッフに表示する。
+      pendingRestrictionVerdict: null // evaluateVisitRestriction() の判定結果（screen-staff-reviewで使用）
     };
 
     let hasSignature = false;
@@ -13270,6 +13413,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           // 見切れた状態）で表示されてしまう。そこで「いちばん上」かつ
           // 「患者さまの枠が横方向の中央にくる」位置を初期表示にする。
           setTimeout(() => resetFamilyTreeScroll(), 0);
+          // 面会制限ルールのある患者様の場合のみ、続柄を選ぶ前にご本人のお名前を
+          // 確認する（evaluateVisitRestriction() での判定・screen-staff-reviewでの
+          // スタッフ確認に使う）。まだ入力していない場合のみ開く（一度入力済みなら、
+          // 戻る操作等で再びこの画面に来ても毎回聞き直さない）。
+          if (AppState.selectedPatient && AppState.selectedPatient.restrictionRules && AppState.selectedPatient.restrictionRules.length > 0 && !AppState.visitorName) {
+            setTimeout(() => openVisitorNameModal(), 0);
+          }
+        } else if (screenId === 'screen-staff-review') {
+          AppState.inputBuffer = '';
+          document.getElementById('staff-review-error-msg').textContent = '';
+          renderStaffReviewContent();
         }
         updateInputDisplay();
         if (screenId !== 'screen-top' && screenId !== 'screen-blocked' && screenId !== 'screen-complete') startIdleTimer();
@@ -13292,6 +13446,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       AppState.entryType = null;
       AppState.lastVisitRecord = null;
       AppState.checkoutSucceeded = false;
+      AppState.visitorName = '';
+      AppState.pendingRestrictionVerdict = null;
       hasSignature = false;
       if (signatureCanvas) clearSignature();
       document.getElementById('relation-selected').textContent = '';
@@ -13390,6 +13546,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           'screen-confirm': 'screen-kana',
           'screen-sign': 'screen-confirm',
           'screen-relation': 'screen-sign',
+          'screen-staff-review': 'screen-relation',
           'screen-phone': 'screen-count',
           'screen-repeat-phone': 'screen-top',
           'screen-repeat-confirm': 'screen-repeat-phone',
@@ -13452,15 +13609,37 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       updateAdminLockoutUI();
     }
 
+    // 管理画面ログインの暗証番号。面会制限「要確認」のスタッフ承認（screen-staff-review）でも
+    // 同じ番号・同じロックアウト状態を使い回す（スタッフしか知らない番号を2つ覚える必要をなくすため。
+    // 抜け道にならないよう、失敗回数のカウント・ロックアウトも完全に共有する＝verifyStaffPassword参照）。
+    const ADMIN_PASSWORD = '1234'; // 【要変更】仮のパスワード。実際の運用パスワードに差し替えてください
+
+    // 【共有ヘルパー】暗証番号の照合＋失敗カウント・ロックアウトの更新。
+    // 管理画面ログイン(verifyAdminPassword)・面会制限の要確認突破(confirmStaffReview)の
+    // 両方から呼ばれる。呼び出し側は戻り値の ok / locked を見て、それぞれの画面に応じた
+    // UI更新（エラーメッセージ・ロックアウト表示など）を行う。
+    function verifyStaffPassword(password) {
+      if (Date.now() < adminLoginAttempts.lockedUntil) return { ok: false, locked: true };
+      if (password === ADMIN_PASSWORD) {
+        adminLoginAttempts = { count: 0, lockedUntil: 0 };
+        return { ok: true, locked: false };
+      }
+      adminLoginAttempts.count++;
+      if (adminLoginAttempts.count >= ADMIN_LOCKOUT_THRESHOLD) {
+        adminLoginAttempts.count = 0;
+        adminLoginAttempts.lockedUntil = Date.now() + ADMIN_LOCKOUT_MS;
+        return { ok: false, locked: true };
+      }
+      return { ok: false, locked: false };
+    }
+
     function verifyAdminPassword() {
       if (Date.now() < adminLoginAttempts.lockedUntil) {
         updateAdminLockoutUI();
         return;
       }
-      const password = AppState.inputBuffer;
-      const correctPassword = '1234'; // 【要変更】仮のパスワード。実際の運用パスワードに差し替えてください
-      if (password === correctPassword) {
-        adminLoginAttempts = { count: 0, lockedUntil: 0 };
+      const result = verifyStaffPassword(AppState.inputBuffer);
+      if (result.ok) {
         // ログインするたびに「🗑 削除済みを表示」はOFFの状態から始める
         // （🔄 更新ボタンでは表示モードを維持したいので、リセットはここだけで行う）。
         AdminViewState.showDeleted = false;
@@ -13470,12 +13649,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         loadAdminDashboard();
         showScreen('screen-admin-dashboard');
       } else {
-        adminLoginAttempts.count++;
         AppState.inputBuffer = '';
         updateInputDisplay();
-        if (adminLoginAttempts.count >= ADMIN_LOCKOUT_THRESHOLD) {
-          adminLoginAttempts.count = 0;
-          adminLoginAttempts.lockedUntil = Date.now() + ADMIN_LOCKOUT_MS;
+        if (result.locked) {
           updateAdminLockoutUI();
         } else {
           document.getElementById('admin-error-msg').textContent = 'パスワードが正しくありません';
@@ -14053,7 +14229,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           if (AppState.inputBuffer.length < 9) AppState.inputBuffer += char;
         } else if (cur === 'screen-kana') {
           if (AppState.kanaBuffer.length < 6) AppState.kanaBuffer += char;
-        } else if (cur === 'screen-admin-login') {
+        } else if (cur === 'screen-admin-login' || cur === 'screen-staff-review') {
           // 現在のパスワードは4桁だが、将来桁数を変更しても打ち直しにならないよう
           // 余裕を持たせて8桁まで入力できるようにしておく。
           if (AppState.inputBuffer.length < 8) AppState.inputBuffer += char;
@@ -14093,6 +14269,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // パスワードなので数字そのものは表示せず、●（入力した桁数分）で表示する。
         const display = document.getElementById('admin-password-display');
         const btn = document.getElementById('admin-login-btn');
+        if (display) display.textContent = AppState.inputBuffer ? '●'.repeat(AppState.inputBuffer.length) : '-';
+        if (btn) btn.disabled = AppState.inputBuffer.length === 0;
+      } else if (AppState.currentScreen === 'screen-staff-review') {
+        const display = document.getElementById('staff-review-pin-display');
+        const btn = document.getElementById('staff-review-confirm-btn');
         if (display) display.textContent = AppState.inputBuffer ? '●'.repeat(AppState.inputBuffer.length) : '-';
         if (btn) btn.disabled = AppState.inputBuffer.length === 0;
       }
@@ -14382,6 +14563,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       return SEED_PATIENT_MASTER;
     }
 
+    // 患者マスタを保存する（面会制限ルールの追加・削除など、管理画面からの編集を反映する）。
+    // 【注意】患者の基本情報（氏名・部屋番号等）は将来CSV自動取り込みに置き換わる想定だが、
+    // 面会制限（restricted / restrictReason / restrictionRules）はCSVには含まれない運用のため、
+    // この保存経路（管理画面からの個別設定）が唯一の変更手段になる。
+    function persistPatientMaster(master) {
+      try {
+        localStorage.setItem('vms_patient_master', JSON.stringify(master));
+        return true;
+      } catch (e) {
+        console.error('患者マスタの保存に失敗しました:', e);
+        if (typeof notifyStorageFailure === 'function') notifyStorageFailure();
+        return false;
+      }
+    }
+
     function getVisitLog() {
       try {
         const stored = localStorage.getItem('vms_visit_log');
@@ -14644,7 +14840,70 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       return master.filter(p => p.roomNo === roomNo && normalizeKana(p.lastNameKana) === normalized);
     }
 
-    function checkRestriction(patient) { return !patient || patient.restricted === true; }
+    // 【面会制限ルール（restrictionRules）について】
+    // 単純な「面会禁止／可」の○×フラグだけでは、実際の運用（「配偶者のみ」「次男（同姓）のみで
+    // その他親族は不可」等）を表現できないため、患者ごとに「どの続柄なら面会できるか」を
+    // 複数のルールとして持たせられるようにしている（管理画面の🔒面会制限の設定から編集）。
+    //
+    // 【自動判定と要スタッフ確認のハイブリッド方針】
+    // ・続柄だけで機械的に判定できるルール（例：「配偶者のみ」「ご家族のみ」）は、キオスクが
+    //   自動的に許可／ブロックする。
+    // ・「同姓のみ」「〇〇様のみ」のように、来館者ご本人の氏名の一致が条件になるルールは、
+    //   氏名の文字列比較だけで自動的に許可／拒否することはしない（同姓同名の別人を誤って
+    //   通してしまう・入力ミスで本来通すべき方を止めてしまう、双方のリスクがあるため）。
+    //   この場合は必ず「スタッフ確認」（screen-staff-review、暗証番号を知るスタッフのみが
+    //   その場で最終判断する）に回す。
+    // ・どのルールにも一致しない続柄は自動的にブロックする（従来通り1階受付窓口へ誘導）。
+    const FAMILY_RELATION_SET = new Set([
+      '父', '母', '夫', '妻', '兄', '弟', '姉', '妹', '子', '孫', 'ひ孫', '甥', '姪',
+      '義父', '義母', '義兄', '義姉', '義弟', '義妹',
+      '長男', '次男', '三男以降', '長女', '次女', '三女以降',
+      '父方の祖父', '父方の祖母', '父方の伯父', '父方の叔父', '父方の伯母', '父方の叔母', '父方の従兄弟', '父方の従姉妹',
+      '母方の祖父', '母方の祖母', '母方の伯父', '母方の叔父', '母方の伯母', '母方の叔母', '母方の従兄弟', '母方の従姉妹'
+    ]);
+    // 「子」を選んだ場合の詳細区分。面会制限ルールのある患者様の場合のみ選択肢として表示する
+    // （通常の面会では、今まで通り「子」の一括りのままで、余計な入力を増やさない）。
+    const CHILD_ORDINAL_OPTIONS = ['長男', '次男', '三男以降', '長女', '次女', '三女以降'];
+
+    // 1件のルールが、来館者が選んだ続柄に一致するか。
+    // 【長男・次男等の扱いについて】これらは「子」の詳細区分だが、特別扱いはせず「妻」「兄」等と
+    // 同じ1つの続柄の値として扱う（AppState.relation にそのまま入る）。唯一の特例は、
+    // ルール側の続柄が「子」（長男・次男等の指定なし）の場合に、長男・次男等どれであっても
+    // 「子」全般として一致させる点だけ。
+    function relationMatchesRule(rule, effectiveRelation) {
+      if (rule.relation === 'ANY_FAMILY') return FAMILY_RELATION_SET.has(effectiveRelation);
+      if (rule.relation === '子') {
+        return effectiveRelation === '子' || CHILD_ORDINAL_OPTIONS.includes(effectiveRelation);
+      }
+      return rule.relation === effectiveRelation;
+    }
+
+    // 面会制限ルールのある患者様について、選ばれた続柄・お名前から可否を判定する。
+    // 戻り値の decision は 'allowed'（自動許可）／'review'（要スタッフ確認）／'blocked'（自動ブロック）。
+    function evaluateVisitRestriction(patient, relation, visitorName) {
+      const rules = (patient && patient.restrictionRules) || [];
+      for (const rule of rules) {
+        if (relationMatchesRule(rule, relation)) {
+          return {
+            decision: rule.requiresIdentityCheck ? 'review' : 'allowed',
+            matchedRule: rule,
+            relation: relation,
+            visitorName: visitorName || ''
+          };
+        }
+      }
+      return { decision: 'blocked', matchedRule: null, relation: relation, visitorName: visitorName || '' };
+    }
+
+    // 【重要】面会制限ルール（restrictionRules）が1件以上設定されている患者様は、この時点では
+    // まだ判定しない（続柄・お名前を確認してから submitRelation() 側で evaluateVisitRestriction()
+    // により判定する）。ルールが無い（＝従来通りの「例外なし」の面会禁止）患者様は、これまで通り
+    // ここで即座にブロックする。
+    function checkRestriction(patient) {
+      if (!patient) return true;
+      if (!patient.restricted) return false;
+      return !(patient.restrictionRules && patient.restrictionRules.length > 0);
+    }
 
     // 【面会禁止患者へのブロック試行の記録】
     // 面会禁止に設定されている患者様への面会が実際に試みられ、screen-blocked
@@ -14654,7 +14913,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     // （下の呼び出し側で try/catch により記録失敗時も screen-blocked への遷移は継続する設計）。
     // 【patient が null の場合はここでは記録しない】checkRestriction() は「患者が見つからない」
     // 場合も true を返すが、それは面会禁止とは別の状況（データ不整合等）のため対象外とする。
-    function logBlockedVisitAttempt(patient, entryType) {
+    // 【extra について】面会制限ルールによるブロック（続柄が一致するルールが無かった場合や、
+    // スタッフが要確認画面で「許可しない」を選んだ場合）では、選ばれた続柄・入力されたお名前も
+    // 合わせて記録できるよう、任意の追加情報を渡せるようにしている。
+    function logBlockedVisitAttempt(patient, entryType, extra) {
       if (!patient) return;
       try {
         const key = 'vms_blocked_attempts_log';
@@ -14667,7 +14929,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           patientLastNameKanji: patient.lastNameKanji,
           patientFirstNameKanji: patient.firstNameKanji,
           restrictReason: patient.restrictReason || '',
-          entryType: entryType
+          entryType: entryType,
+          attemptedRelation: (extra && extra.relation) ? extra.relation : '',
+          visitorName: (extra && extra.visitorName) || ''
         });
         localStorage.setItem(key, JSON.stringify(log));
       } catch (e) {
@@ -14693,10 +14957,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       }
       container.innerHTML = log.map(e => {
         const name = `${e.patientLastNameKanji || ''}${e.patientFirstNameKanji || ''}`;
+        const detailParts = [];
+        if (e.attemptedRelation) detailParts.push(`来館者との続柄：${e.attemptedRelation}`);
+        if (e.visitorName) detailParts.push(`入力されたお名前：${e.visitorName}`);
+        const detailLine = detailParts.length ? `<div style="color: var(--color-text-sub); margin-top: 2px;">${detailParts.join('　／　')}</div>` : '';
         return `
           <div style="padding: 10px 14px; border-bottom: 1px solid var(--color-border); font-size: 13px;">
             <div style="font-weight: 600;">${e.displayTime}　${e.roomNo}号室　${name}様</div>
             <div style="color: var(--color-text-sub); margin-top: 2px;">理由：${e.restrictReason || '（未設定）'}　／　${e.entryType === 'repeat' ? '2回目以降の面会（電話番号）' : '新規受付'}から</div>
+            ${detailLine}
           </div>
         `;
       }).join('');
@@ -14722,6 +14991,150 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         console.error('面会禁止試行履歴の消去に失敗しました:', e);
       }
       renderBlockedAttemptsList();
+    }
+
+    // ============================================================
+    // 管理画面：面会制限ルールの設定
+    // ============================================================
+    let RestrictionModalState = { selectedPatientId: null };
+
+    function openRestrictionRulesModal() {
+      RestrictionModalState.selectedPatientId = null;
+      document.getElementById('restriction-search-input').value = '';
+      document.getElementById('restriction-search-view').style.display = 'block';
+      document.getElementById('restriction-edit-view').style.display = 'none';
+      renderRestrictionSearchResults();
+      document.getElementById('restriction-rules-modal').style.display = 'flex';
+    }
+
+    function closeRestrictionRulesModal() {
+      document.getElementById('restriction-rules-modal').style.display = 'none';
+    }
+
+    function renderRestrictionSearchResults() {
+      const q = (document.getElementById('restriction-search-input').value || '').trim();
+      const master = fetchPatientMaster();
+      const qNorm = normalizeKana(q);
+      const results = q
+        ? master.filter(p => p.roomNo.includes(q) || normalizeKana(p.lastNameKana).includes(qNorm) || normalizeKana(p.firstNameKana).includes(qNorm))
+        : master;
+      const container = document.getElementById('restriction-search-results');
+      if (results.length === 0) {
+        container.innerHTML = '<div style="padding: 15px; text-align: center; color: #999;">該当する患者様が見つかりません</div>';
+        return;
+      }
+      container.innerHTML = results.map(p => {
+        const badge = p.restricted ? '<span style="color: var(--color-alert); font-weight: 600;">🔒 面会制限あり</span>' : '<span style="color: #999;">制限なし</span>';
+        return `
+          <div style="padding: 10px 14px; border-bottom: 1px solid var(--color-border); cursor: pointer;" onclick="selectRestrictionPatient('${p.patientId}')">
+            <div style="font-weight: 600;">${p.roomNo}号室　${p.lastNameKanji}${p.firstNameKanji || ''}様</div>
+            <div style="font-size: 12px; margin-top: 2px;">${badge}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectRestrictionPatient(patientId) {
+      RestrictionModalState.selectedPatientId = patientId;
+      document.getElementById('restriction-search-view').style.display = 'none';
+      document.getElementById('restriction-edit-view').style.display = 'block';
+      renderRestrictionEditView();
+    }
+
+    function backToRestrictionSearch() {
+      RestrictionModalState.selectedPatientId = null;
+      document.getElementById('restriction-search-view').style.display = 'block';
+      document.getElementById('restriction-edit-view').style.display = 'none';
+      renderRestrictionSearchResults();
+    }
+
+    function getSelectedRestrictionPatient(master) {
+      return master.find(p => p.patientId === RestrictionModalState.selectedPatientId);
+    }
+
+    function renderRestrictionEditView() {
+      const master = fetchPatientMaster();
+      const patient = getSelectedRestrictionPatient(master);
+      if (!patient) return;
+      document.getElementById('restriction-edit-patient-header').textContent = `${patient.roomNo}号室　${patient.lastNameKanji}${patient.firstNameKanji || ''}様`;
+      const rules = patient.restrictionRules || [];
+      const statusEl = document.getElementById('restriction-edit-status');
+      if (!patient.restricted) {
+        statusEl.textContent = '現在：面会制限なし';
+      } else if (rules.length === 0) {
+        statusEl.textContent = '現在：面会制限あり（例外なし・全面禁止）';
+      } else {
+        statusEl.textContent = `現在：面会制限あり（${rules.length}件のルールで一部許可）`;
+      }
+      const listEl = document.getElementById('restriction-rules-list');
+      listEl.innerHTML = rules.map(r => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 6px; margin-bottom: 6px;">
+          <div>
+            <div style="font-weight: 600;">${r.relation === 'ANY_FAMILY' ? 'ご家族全般' : r.relation}${r.requiresIdentityCheck ? '　<span style="color: #E8A33D;">（要スタッフ確認）</span>' : '　<span style="color: var(--color-primary);">（自動許可）</span>'}</div>
+            <div style="font-size: 12px; color: var(--color-text-sub);">${r.note || ''}</div>
+          </div>
+          <button onclick="deleteRestrictionRule('${r.id}')" style="padding: 6px 10px; background: white; color: var(--color-alert); border: 1px solid var(--color-alert); border-radius: 6px; cursor: pointer;">削除</button>
+        </div>
+      `).join('');
+      document.getElementById('restriction-rule-note').value = '';
+      document.getElementById('restriction-rule-identity-check').checked = false;
+    }
+
+    function setBlanketRestriction() {
+      const master = fetchPatientMaster();
+      const patient = getSelectedRestrictionPatient(master);
+      if (!patient) return;
+      if (!confirm(`${patient.lastNameKanji}${patient.firstNameKanji || ''}様への面会を、例外なく全面禁止に設定します。よろしいですか？`)) return;
+      patient.restricted = true;
+      patient.restrictionRules = [];
+      if (!patient.restrictReason) patient.restrictReason = '面会禁止';
+      persistPatientMaster(master);
+      renderRestrictionEditView();
+    }
+
+    function clearAllRestriction() {
+      const master = fetchPatientMaster();
+      const patient = getSelectedRestrictionPatient(master);
+      if (!patient) return;
+      if (patient.restricted && !confirm(`${patient.lastNameKanji}${patient.firstNameKanji || ''}様の面会制限をすべて解除します。よろしいですか？`)) return;
+      patient.restricted = false;
+      patient.restrictionRules = [];
+      patient.restrictReason = '';
+      persistPatientMaster(master);
+      renderRestrictionEditView();
+    }
+
+    function addRestrictionRule() {
+      const master = fetchPatientMaster();
+      const patient = getSelectedRestrictionPatient(master);
+      if (!patient) return;
+      const relation = document.getElementById('restriction-rule-relation').value;
+      const requiresIdentityCheck = document.getElementById('restriction-rule-identity-check').checked;
+      const note = document.getElementById('restriction-rule-note').value.trim();
+      if (!note) {
+        alert('スタッフ向けメモ（面会の条件の説明）を入力してください。');
+        return;
+      }
+      if (!patient.restrictionRules) patient.restrictionRules = [];
+      patient.restrictionRules.push({
+        id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        relation: relation,
+        requiresIdentityCheck: requiresIdentityCheck,
+        note: note
+      });
+      patient.restricted = true;
+      if (!patient.restrictReason) patient.restrictReason = note;
+      persistPatientMaster(master);
+      renderRestrictionEditView();
+    }
+
+    function deleteRestrictionRule(ruleId) {
+      const master = fetchPatientMaster();
+      const patient = getSelectedRestrictionPatient(master);
+      if (!patient || !patient.restrictionRules) return;
+      patient.restrictionRules = patient.restrictionRules.filter(r => r.id !== ruleId);
+      persistPatientMaster(master);
+      renderRestrictionEditView();
     }
 
     function buildNarrowOptions(candidates) {
@@ -15065,10 +15478,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     function confirmPatient() {
       const master = fetchPatientMaster();
       const latest = master.find(p => p.patientId === AppState.selectedPatient.patientId);
+      // 面会制限ルール（restrictionRules）の最新の内容を使って判定できるよう、以降は
+      // このマスタ取得し直した latest を使う（検索時点でキャッシュされていた古い可能性のある
+      // AppState.selectedPatient のままにしない）。
+      AppState.selectedPatient = latest || AppState.selectedPatient;
       if (checkRestriction(latest)) {
         if (latest && latest.restricted) logBlockedVisitAttempt(latest, 'new');
         showScreen('screen-blocked');
       } else {
+        // 面会制限ルールのある患者様も、この時点ではまだ判定しない
+        // （署名・続柄選択のあと、submitRelation() で判定する）。
         showScreen('screen-sign');
       }
     }
@@ -15121,6 +15540,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // （それでも当てはまらない場合のために「その他」も残す）。
         '後見人・その他': ['後見人', '友人・知人', '職場関係者', 'ケアマネジャー・施設関係者', 'その他']
       };
+
+      // 面会制限ルールのある患者様の場合のみ、「子」を長男・次男…と区別できるようにする
+      // （通常の面会では、今まで通り「子」の一括りのまま。CHILD_ORDINAL_OPTIONSはcheckRestriction
+      // 付近で定義）。
+      if (relationName === '子' && AppState.selectedPatient && AppState.selectedPatient.restrictionRules && AppState.selectedPatient.restrictionRules.length > 0) {
+        details['子'] = CHILD_ORDINAL_OPTIONS.slice();
+      }
 
       const modal = document.getElementById('relation-detail-modal');
       const title = document.getElementById('detail-title');
@@ -15256,12 +15682,159 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       closeRelationOtherModal();
     }
 
+    // 面会制限ルールのある患者様の面会でのみ使う、来館者名入力用のミニかなキーボード。
+    // relationOtherBuffer と同様、AppState.inputBuffer / pressKey とは独立した状態を持たせている。
+    let visitorNameBuffer = '';
+
+    function openVisitorNameModal() {
+      visitorNameBuffer = AppState.visitorName || '';
+      renderVisitorNameKeyboard();
+      updateVisitorNameDisplay();
+      document.getElementById('visitor-name-modal').style.display = 'flex';
+    }
+
+    function renderVisitorNameKeyboard() {
+      const container = document.getElementById('visitor-name-keyboard');
+      container.innerHTML = '';
+      const kanas = [
+        ['わ', 'ら', 'や', 'ま', 'は', 'な', 'た', 'さ', 'か', 'あ'],
+        ['を', 'り', '', 'み', 'ひ', 'に', 'ち', 'し', 'き', 'い'],
+        ['ん', 'る', 'ゆ', 'む', 'ふ', 'ぬ', 'つ', 'す', 'く', 'う'],
+        ['', 'れ', '', 'め', 'へ', 'ね', 'て', 'せ', 'け', 'え'],
+        ['ー', 'ろ', 'よ', 'も', 'ほ', 'の', 'と', 'そ', 'こ', 'お'],
+        ['゛', '゜', '小', '', '', '', '', '', '', '']
+      ];
+      kanas.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'kana-row';
+        row.forEach(kana => {
+          const btn = document.createElement('button');
+          btn.className = 'kana-btn';
+          btn.textContent = kana;
+          if (kana) btn.onclick = () => pressVisitorNameKey(kana);
+          else btn.style.visibility = 'hidden';
+          rowDiv.appendChild(btn);
+        });
+        container.appendChild(rowDiv);
+      });
+    }
+
+    function pressVisitorNameKey(char) {
+      if (char === '゛') {
+        if (visitorNameBuffer.length > 0) {
+          const lastChar = visitorNameBuffer[visitorNameBuffer.length - 1];
+          if (REVERSE_DAKUTEN_MAP[lastChar]) visitorNameBuffer = visitorNameBuffer.slice(0, -1) + REVERSE_DAKUTEN_MAP[lastChar];
+          else if (DAKUTEN_MAP[lastChar]) visitorNameBuffer = visitorNameBuffer.slice(0, -1) + DAKUTEN_MAP[lastChar];
+        }
+      } else if (char === '゜') {
+        if (visitorNameBuffer.length > 0) {
+          const lastChar = visitorNameBuffer[visitorNameBuffer.length - 1];
+          if (REVERSE_HANDAKUTEN_MAP[lastChar]) visitorNameBuffer = visitorNameBuffer.slice(0, -1) + REVERSE_HANDAKUTEN_MAP[lastChar];
+          else if (HANDAKUTEN_MAP[lastChar]) visitorNameBuffer = visitorNameBuffer.slice(0, -1) + HANDAKUTEN_MAP[lastChar];
+        }
+      } else if (char === '小') {
+        if (visitorNameBuffer.length > 0) {
+          const lastChar = visitorNameBuffer[visitorNameBuffer.length - 1];
+          if (REVERSE_SMALL_KANA_MAP[lastChar]) visitorNameBuffer = visitorNameBuffer.slice(0, -1) + REVERSE_SMALL_KANA_MAP[lastChar];
+          else if (SMALL_KANA_MAP[lastChar]) visitorNameBuffer = visitorNameBuffer.slice(0, -1) + SMALL_KANA_MAP[lastChar];
+        }
+      } else {
+        if (visitorNameBuffer.length < 12) visitorNameBuffer += char;
+      }
+      updateVisitorNameDisplay();
+    }
+
+    function backspaceVisitorName() {
+      visitorNameBuffer = visitorNameBuffer.slice(0, -1);
+      updateVisitorNameDisplay();
+    }
+
+    function updateVisitorNameDisplay() {
+      document.getElementById('visitor-name-display').textContent = visitorNameBuffer || '-';
+      document.getElementById('visitor-name-confirm-btn').disabled = !visitorNameBuffer;
+    }
+
+    function confirmVisitorName() {
+      if (!visitorNameBuffer) return;
+      AppState.visitorName = visitorNameBuffer;
+      document.getElementById('visitor-name-modal').style.display = 'none';
+    }
+
     function submitRelation() {
       if (!AppState.relation) {
         alert('ご関係をお選びください');
         return;
       }
+      const patient = AppState.selectedPatient;
+      if (patient && patient.restrictionRules && patient.restrictionRules.length > 0) {
+        if (!AppState.visitorName) {
+          // お名前の入力をまだ済ませていない（モーダルを閉じてしまった等）場合は、
+          // 続柄選択を進めさせず、あらためて入力してもらう。
+          openVisitorNameModal();
+          return;
+        }
+        const verdict = evaluateVisitRestriction(patient, AppState.relation, AppState.visitorName);
+        AppState.pendingRestrictionVerdict = verdict;
+        if (verdict.decision === 'blocked') {
+          logBlockedVisitAttempt(patient, AppState.entryType, verdict);
+          showScreen('screen-blocked');
+          return;
+        }
+        if (verdict.decision === 'review') {
+          showScreen('screen-staff-review');
+          return;
+        }
+        // decision === 'allowed' の場合はそのまま下へ進む
+      }
       showScreen('screen-count');
+    }
+
+    // screen-staff-review：患者情報・条件・来館者が選んだ続柄とお名前を、スタッフが
+    // 確認しやすいようにまとめて表示する。
+    function renderStaffReviewContent() {
+      const patient = AppState.selectedPatient;
+      const verdict = AppState.pendingRestrictionVerdict;
+      const content = document.getElementById('staff-review-content');
+      if (!patient || !verdict) { content.innerHTML = ''; return; }
+      const note = (verdict.matchedRule && verdict.matchedRule.note) ? verdict.matchedRule.note : '（条件の詳細は未記入です）';
+      content.innerHTML = `
+        <div class="confirm-room">${patient.roomNo} 号室</div>
+        <div class="confirm-name">${patient.lastNameKanji}${patient.firstNameKanji || ''}　様</div>
+        <div style="margin-top: 15px; padding: 12px; background: #FFF8E1; border-radius: 8px;">
+          <div style="font-size: var(--fs-xs); color: var(--color-text-sub);">面会の条件</div>
+          <div style="font-weight: 600;">${note}</div>
+        </div>
+        <div style="margin-top: 10px; font-size: var(--fs-sm);">来館者が選んだご関係：<strong>${formatRelationLabel(verdict.relation, AppState.relationOther)}</strong></div>
+        <div style="margin-top: 5px; font-size: var(--fs-sm);">来館者が入力したお名前：<strong>${verdict.visitorName || '（未入力）'}</strong></div>
+        <div style="margin-top: 15px; font-size: var(--fs-xs); color: var(--color-text-sub);">ご本人確認の上、面会を許可する場合は暗証番号を入力してください。</div>
+      `;
+    }
+
+    function confirmStaffReview() {
+      if (Date.now() < adminLoginAttempts.lockedUntil) {
+        document.getElementById('staff-review-error-msg').textContent = '間違いが続いたため、しばらくお待ちください（管理画面ログインと共通のロックアウトです）。';
+        return;
+      }
+      const result = verifyStaffPassword(AppState.inputBuffer);
+      AppState.inputBuffer = '';
+      updateInputDisplay();
+      if (result.ok) {
+        document.getElementById('staff-review-error-msg').textContent = '';
+        showScreen('screen-count');
+        return;
+      }
+      if (result.locked) {
+        document.getElementById('staff-review-error-msg').textContent = '間違いが続いたため、しばらくお待ちください（管理画面ログインと共通のロックアウトです）。';
+      } else {
+        document.getElementById('staff-review-error-msg').textContent = '暗証番号が正しくありません';
+      }
+    }
+
+    function denyStaffReview() {
+      const patient = AppState.selectedPatient;
+      const verdict = AppState.pendingRestrictionVerdict || {};
+      logBlockedVisitAttempt(patient, AppState.entryType, { relation: verdict.relation, visitorName: verdict.visitorName });
+      showScreen('screen-blocked');
     }
 
     function selectCount(n) {
@@ -15313,6 +15886,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           showScreen('screen-repeat-confirm');
         }
       }
+    }
+
+    // screen-repeat-confirm の「このまま進む」ボタン。
+    // 【面会制限ルールのある患者様】前回と同じご関係のまま自動的に進めてしまうと、
+    // 「本当に同じ方が来られているか」「ルールが前回から変わっていないか」を毎回確認できない。
+    // そのため、通常は screen-count へそのまま進むところを、この場合だけ続柄・お名前を
+    // あらためて確認する screen-relation に回す（署名は前回のものを再利用する＝
+    // 「書き直す」を選んだわけではないため）。
+    function proceedRepeatVisit() {
+      const patient = AppState.selectedPatient;
+      if (patient && patient.restrictionRules && patient.restrictionRules.length > 0) {
+        AppState.relation = null;
+        AppState.relationOther = '';
+        AppState.visitorName = '';
+        showScreen('screen-relation');
+        return;
+      }
+      showScreen('screen-count');
     }
 
     function renderRepeatConfirm(rec, patient) {
@@ -15535,6 +16126,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       renderNumpad('numpad-repeat-phone');
       renderNumpad('numpad-checkout');
       renderNumpad('numpad-admin-password');
+      renderNumpad('numpad-staff-review-pin');
       renderKanaKeyboard();
 
       // SVG ノードにクリックイベントを設定
