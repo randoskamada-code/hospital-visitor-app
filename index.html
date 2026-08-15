@@ -607,11 +607,20 @@
             この端末に保存されている面会履歴（削除済みの記録は含みません）を、日時入りのファイル名でダウンロードします（保存先はブラウザの「ダウンロード」フォルダです。USBメモリへの保存はできません）。
           </div>
 
+          <!-- 一括操作バー：チェックボックスで1件以上選択している間だけ表示する -->
+          <div id="admin-bulk-bar" style="display: none; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 12px; background-color: #FFF8E1; border: 1px solid #F5A623; border-radius: 6px;">
+            <span id="admin-bulk-count" style="font-size: 13px; font-weight: 600;"></span>
+            <button onclick="adminBulkCheckout()" id="admin-bulk-checkout-btn" style="padding: 6px 12px; font-size: 12px; background-color: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">まとめて退館処理</button>
+            <button onclick="adminBulkDelete()" id="admin-bulk-delete-btn" style="padding: 6px 12px; font-size: 12px; background-color: white; color: var(--color-alert); border: 1px solid var(--color-alert); border-radius: 4px; cursor: pointer; font-weight: 600;">まとめて削除</button>
+            <button onclick="adminBulkRestore()" id="admin-bulk-restore-btn" style="padding: 6px 12px; font-size: 12px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; display: none;">まとめて復元</button>
+          </div>
+
           <!-- 訪問記録テーブル -->
           <div class="admin-table-wrap">
             <table class="admin-table">
               <thead>
                 <tr id="admin-table-head-row">
+                  <th class="col-nowrap" style="text-align: center;"><input type="checkbox" id="admin-select-all" onchange="toggleAdminSelectAll(this.checked)"></th>
                   <th class="col-nowrap">受付番号</th>
                   <th class="col-nowrap">患者氏名</th>
                   <th class="col-nowrap">患者部屋</th>
@@ -627,7 +636,7 @@
               </thead>
               <tbody id="admin-table-body">
                 <tr style="border-bottom: 1px solid #ddd;">
-                  <td colspan="11" style="padding: 15px; text-align: center; color: #999;">データなし</td>
+                  <td colspan="12" style="padding: 15px; text-align: center; color: #999;">データなし</td>
                 </tr>
               </tbody>
             </table>
@@ -13380,6 +13389,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         AdminViewState.showDeleted = false;
         const trashBtn = document.getElementById('admin-trash-toggle-btn');
         if (trashBtn) trashBtn.textContent = '🗑 削除済みを表示';
+        clearAdminSelection();
         loadAdminDashboard();
         showScreen('screen-admin-dashboard');
       } else {
@@ -13445,8 +13455,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 既に退館済みの行では誤操作防止のためボタンを出さない。
         // 【削除ボタンについて】印刷ミス・二重登録・お部屋間違い等で不要になった記録を、
         // 係員が管理画面から削除できるようにする（adminDeleteEntry参照）。状態に関わらず表示する。
+        // 【表示/非表示ではなく visibility:hidden にしている理由】このテーブルは
+        // table-layout の指定が無く、ブラウザが列幅を内容にあわせて自動計算している。
+        // 「退館処理」ボタンをHTMLごと消してしまうと操作列の必要幅が急に狭くなり、
+        // その余白が受付番号など他の列に再配分されてテーブル全体の幅が変わってしまう
+        // （＝退館処理を押した瞬間に受付番号列が広がり、横スクロールが必要になる不具合の原因）。
+        // ボタン自体はそのまま残して見た目だけ消すことで、操作列の幅を常に同じに保ち、
+        // 他の列の幅が退館処理の前後で変わらないようにしている。
         const checkoutBtn = entry.checkoutTime
-          ? ''
+          ? `<button disabled tabindex="-1" aria-hidden="true" style="padding: 3px 8px; font-size: 11px; border: none; border-radius: 4px; margin-right: 4px; visibility: hidden; pointer-events: none;">退館処理</button>`
           : `<button onclick="adminManualCheckout('${entry.visitId}')" style="padding: 3px 8px; font-size: 11px; background-color: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px;">退館処理</button>`;
         const deleteBtn = `<button onclick="adminDeleteEntry('${entry.visitId}')" style="padding: 3px 8px; font-size: 11px; background-color: white; color: var(--color-alert); border: 1px solid var(--color-alert); border-radius: 4px; cursor: pointer;">削除</button>`;
         actionCell = `<td class="col-nowrap" style="text-align: center; white-space: nowrap;">${checkoutBtn}${deleteBtn}</td>`;
@@ -13466,8 +13483,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         ? '-'
         : (checkoutParts.date === checkin.date ? checkoutParts.time : `${checkoutParts.date} ${checkoutParts.time}`);
 
+      // 一括操作（まとめて削除／まとめて退館処理／まとめて復元）用のチェックボックス。
+      // AdminSelection（選択中のvisitIdのSet）と連動し、再描画をまたいでも選択状態を保つ。
+      const checkboxCell = `<td class="col-nowrap" style="text-align: center;"><input type="checkbox" class="admin-row-checkbox" data-visit-id="${entry.visitId}" onchange="toggleAdminRowSelection('${entry.visitId}', this.checked)" ${AdminSelection.has(entry.visitId) ? 'checked' : ''}></td>`;
+
       return `
         <tr>
+          ${checkboxCell}
           <td class="col-nowrap">${entry.visitId}</td>
           <td class="col-nowrap">${patientName}</td>
           <td class="col-nowrap">${entry.roomNo}号室</td>
@@ -13581,6 +13603,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     // 見出し行の定義（key が null の列は並び替え非対応：面会者署名は画像表示ボタンのみ、関係は自由記述のため）
     const ADMIN_SORT_COLUMNS = [
+      { key: null, label: '<input type="checkbox" id="admin-select-all" onchange="toggleAdminSelectAll(this.checked)">' },
       { key: 'visitId', label: '受付番号' },
       { key: 'patientName', label: '患者氏名' },
       { key: 'roomNo', label: '患者部屋' },
@@ -13652,8 +13675,141 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     // 管理画面の表示状態（🗑 削除済みを表示のON/OFF）。
     let AdminViewState = { showDeleted: false };
 
+    // 【一括操作について】1件ずつ「削除」「退館処理」するのは記録が多いと手間がかかるため、
+    // チェックボックスで複数選択してまとめて処理できるようにしている。選択状態は
+    // visitId のSetで管理し、再描画（並び替え・検索・🔄更新）をまたいでも保持する。
+    // 表示モード（通常⇔削除済み）を切り替えた時や、検索条件を変えた時、
+    // 一括操作を実行した後は、選択の対象がずれる可能性があるためクリアする。
+    let AdminSelection = new Set();
+
+    function clearAdminSelection() {
+      AdminSelection.clear();
+      const selectAll = document.getElementById('admin-select-all');
+      if (selectAll) selectAll.checked = false;
+      updateAdminBulkBar();
+    }
+
+    function toggleAdminRowSelection(visitId, checked) {
+      if (checked) AdminSelection.add(visitId); else AdminSelection.delete(visitId);
+      const selectAll = document.getElementById('admin-select-all');
+      if (selectAll) {
+        const boxes = document.querySelectorAll('.admin-row-checkbox');
+        selectAll.checked = boxes.length > 0 && Array.from(boxes).every(b => b.checked);
+      }
+      updateAdminBulkBar();
+    }
+
+    function toggleAdminSelectAll(checked) {
+      document.querySelectorAll('.admin-row-checkbox').forEach(cb => {
+        cb.checked = checked;
+        if (checked) AdminSelection.add(cb.dataset.visitId); else AdminSelection.delete(cb.dataset.visitId);
+      });
+      updateAdminBulkBar();
+    }
+
+    // 一括操作バーの表示/非表示と、通常一覧／削除済み一覧のどちらを見ているかによって
+    // 出すボタン（まとめて退館処理・まとめて削除 ⇔ まとめて復元）を切り替える。
+    function updateAdminBulkBar() {
+      const bar = document.getElementById('admin-bulk-bar');
+      const countEl = document.getElementById('admin-bulk-count');
+      const checkoutBtn = document.getElementById('admin-bulk-checkout-btn');
+      const deleteBtn = document.getElementById('admin-bulk-delete-btn');
+      const restoreBtn = document.getElementById('admin-bulk-restore-btn');
+      if (!bar || !countEl) return;
+
+      if (AdminSelection.size === 0) {
+        bar.style.display = 'none';
+        return;
+      }
+      bar.style.display = 'flex';
+      countEl.textContent = `${AdminSelection.size}件選択中`;
+      if (AdminViewState.showDeleted) {
+        if (checkoutBtn) checkoutBtn.style.display = 'none';
+        if (deleteBtn) deleteBtn.style.display = 'none';
+        if (restoreBtn) restoreBtn.style.display = '';
+      } else {
+        if (checkoutBtn) checkoutBtn.style.display = '';
+        if (deleteBtn) deleteBtn.style.display = '';
+        if (restoreBtn) restoreBtn.style.display = 'none';
+      }
+    }
+
+    // 選択された受付番号から、対象行の「お部屋・お名前」の一覧テキストを作る
+    // （確認ダイアログに何件・誰が対象かを表示し、意図しない一括操作を防ぐため）。
+    function buildAdminSelectionPreview(entries, master) {
+      const lines = entries.slice(0, 5).map(e => `・${e.roomNo}号室 ${resolvePatientDisplayName(e, master)}様（${e.visitId}）`);
+      const more = entries.length > 5 ? `\n...ほか${entries.length - 5}件` : '';
+      return lines.join('\n') + more;
+    }
+
+    // 「まとめて削除」：選択中の記録をまとめてソフトデリートする。
+    function adminBulkDelete() {
+      if (AdminSelection.size === 0) return;
+      const log = getVisitLog();
+      const master = fetchPatientMaster();
+      const targets = log.filter(e => AdminSelection.has(e.visitId) && !e.deleted);
+      if (targets.length === 0) { clearAdminSelection(); renderAdminTable(); return; }
+
+      const preview = buildAdminSelectionPreview(targets, master);
+      const ok = confirm(`選択した${targets.length}件の記録を削除します。\n（誤って削除した場合は「🗑 削除済みを表示」から元に戻せます）\n\n${preview}\n\nよろしいですか？`);
+      if (!ok) return;
+
+      const now = new Date().toISOString();
+      targets.forEach(e => { e.deleted = true; e.deletedAt = now; });
+      const saved = persistVisitLog(log);
+      if (!saved) return;
+
+      clearAdminSelection();
+      renderAdminTable();
+    }
+
+    // 「まとめて退館処理」：選択中の（まだ退館していない）記録をまとめて退館済みにする。
+    function adminBulkCheckout() {
+      if (AdminSelection.size === 0) return;
+      const log = getVisitLog();
+      const master = fetchPatientMaster();
+      const targets = log.filter(e => AdminSelection.has(e.visitId) && !e.deleted && !e.checkoutTime);
+      if (targets.length === 0) { clearAdminSelection(); renderAdminTable(); return; }
+
+      const preview = buildAdminSelectionPreview(targets, master);
+      const ok = confirm(`選択した${targets.length}件を退館済みとして記録します。\n\n${preview}\n\nよろしいですか？`);
+      if (!ok) return;
+
+      const now = new Date();
+      targets.forEach(e => {
+        e.checkoutTime = formatTimestamp(now);
+        e.checkoutTimestamp = now.toISOString();
+      });
+      const saved = persistVisitLog(log);
+      if (!saved) return;
+
+      clearAdminSelection();
+      renderAdminTable();
+    }
+
+    // 「まとめて復元」：削除済み一覧（🗑 削除済みを表示）で選択した記録をまとめて元に戻す。
+    function adminBulkRestore() {
+      if (AdminSelection.size === 0) return;
+      const log = getVisitLog();
+      const master = fetchPatientMaster();
+      const targets = log.filter(e => AdminSelection.has(e.visitId) && e.deleted);
+      if (targets.length === 0) { clearAdminSelection(); renderAdminTable(); return; }
+
+      const preview = buildAdminSelectionPreview(targets, master);
+      const ok = confirm(`選択した${targets.length}件の記録を元に戻します。\n\n${preview}\n\nよろしいですか？`);
+      if (!ok) return;
+
+      targets.forEach(e => { delete e.deleted; delete e.deletedAt; });
+      const saved = persistVisitLog(log);
+      if (!saved) return;
+
+      clearAdminSelection();
+      renderAdminTable();
+    }
+
     function toggleAdminTrashView() {
       AdminViewState.showDeleted = !AdminViewState.showDeleted;
+      clearAdminSelection();
       const btn = document.getElementById('admin-trash-toggle-btn');
       if (btn) {
         btn.textContent = AdminViewState.showDeleted ? '🗑 通常の一覧に戻る' : '🗑 削除済みを表示';
@@ -13720,18 +13876,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       const visibleLog = log.filter(e => AdminViewState.showDeleted ? !!e.deleted : !e.deleted);
       if (visibleLog.length === 0) {
         const emptyMsg = AdminViewState.showDeleted ? '削除済みの記録はありません' : '訪問記録なし';
-        tbody.innerHTML = `<tr><td colspan="11" style="padding: 15px; text-align: center; color: #999;">${emptyMsg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" style="padding: 15px; text-align: center; color: #999;">${emptyMsg}</td></tr>`;
+        AdminSelection.clear();
+        updateAdminBulkBar();
         return;
       }
 
       const filtered = sortAdminEntries(getFilteredAdminEntries(log, master), master);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
+        AdminSelection.clear();
+        updateAdminBulkBar();
         return;
       }
 
       tbody.innerHTML = filtered.map(entry => buildAdminRow(entry, master, AdminViewState.showDeleted)).join('');
+
+      // 表示から外れた（フィルターや個別操作で見えなくなった）行の選択状態は取り除いておく。
+      // これをしないと、まとめて操作バーの件数表示が実際に見えている選択件数とずれてしまう。
+      const visibleIds = new Set(filtered.map(e => e.visitId));
+      Array.from(AdminSelection).forEach(id => { if (!visibleIds.has(id)) AdminSelection.delete(id); });
+      const selectAllBox = document.getElementById('admin-select-all');
+      if (selectAllBox) {
+        selectAllBox.checked = filtered.length > 0 && filtered.every(e => AdminSelection.has(e.visitId));
+      }
+      updateAdminBulkBar();
     }
 
     function loadAdminDashboard() {
@@ -13740,6 +13910,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     }
 
     function applyAdminFilters() {
+      clearAdminSelection();
       renderAdminTable();
     }
     function showSignature(visitId) {
