@@ -560,7 +560,7 @@
           </div>
           <div class="two-button-row no-print" style="margin-top: 40px;">
             <button class="btn-confirm" onclick="printLabel()">面会証を印刷する</button>
-            <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="goTop()">終了して最初に戻る</button>
+            <button class="btn-confirm" style="background-color: var(--color-primary); color: white;" onclick="finishCompleteScreen()">終了して最初に戻る</button>
           </div>
           <div class="timer-text">(20秒後に自動で最初の画面に戻ります)</div>
         </div>
@@ -600,10 +600,11 @@
             <input type="date" id="admin-filter-date" class="admin-filter-input">
             <input type="text" id="admin-filter-patient" placeholder="患者氏名" class="admin-filter-input" style="width: 110px;">
             <button onclick="applyAdminFilters()" class="admin-filter-search-btn">検索</button>
-            <button onclick="downloadVisitLogBackup()" class="admin-backup-btn">💾 バックアップを保存</button>
+            <button onclick="toggleAdminTrashView()" class="admin-backup-btn" id="admin-trash-toggle-btn" style="border-color: #999; color: #666;">🗑 削除済みを表示</button>
+            <button onclick="downloadVisitLogBackup()" class="admin-backup-btn" id="admin-backup-btn">💾 バックアップを保存</button>
           </div>
-          <div style="text-align: center; font-size: 11px; color: var(--color-text-sub); margin-top: -10px; margin-bottom: 16px;">
-            この端末に保存されている面会履歴を、日時入りのファイル名でダウンロードします（保存先はブラウザの「ダウンロード」フォルダです。USBメモリへの保存はできません）。
+          <div style="text-align: center; font-size: 11px; color: var(--color-text-sub); margin-top: -10px; margin-bottom: 16px;" id="admin-backup-help">
+            この端末に保存されている面会履歴（削除済みの記録は含みません）を、日時入りのファイル名でダウンロードします（保存先はブラウザの「ダウンロード」フォルダです。USBメモリへの保存はできません）。
           </div>
 
           <!-- 訪問記録テーブル -->
@@ -621,11 +622,12 @@
                   <th class="col-nowrap">入館時間</th>
                   <th class="col-nowrap">退館時間</th>
                   <th class="col-nowrap">状態</th>
+                  <th class="col-nowrap">操作</th>
                 </tr>
               </thead>
               <tbody id="admin-table-body">
                 <tr style="border-bottom: 1px solid #ddd;">
-                  <td colspan="10" style="padding: 15px; text-align: center; color: #999;">データなし</td>
+                  <td colspan="11" style="padding: 15px; text-align: center; color: #999;">データなし</td>
                 </tr>
               </tbody>
             </table>
@@ -13180,6 +13182,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         if (screenId === 'screen-sign') {
           AppState.signatureData = null;
           hasSignature = false;
+          // 【表示直後に前回の署名が一瞬見えてしまう不具合の修正】
+          // 以前はこの画面が見えるようになった後、100ms遅れて initSignatureCanvas()（内部で
+          // clearSignature()）が実行される作りだったため、2人目以降の来客が署名画面に
+          // 切り替わった瞬間、前の来客が描いた署名がまだCanvas上に残ったまま一瞬見えてから
+          // 消える、という不具合があった。画面を表示する（is-active を付ける）のと同じ
+          // 同期処理の中で、既に初期化済みのCanvasがあれば直ちにクリアしておくことで、
+          // ブラウザが実際に描画する前にクリアを完了させ、古い署名が見えないようにする。
+          // （canvas.width への代入は、同じ値であってもCanvasの内容を即座に完全消去する
+          // 標準的な方法。透明になるが #signature-canvas の background-color:white で
+          // 白紙に見える。サイズ設定・筆記イベントの登録などの本処理は、レイアウト確定後に
+          // 引き続き initSignatureCanvas() で行う。）
+          if (signatureCanvas) {
+            signatureCanvas.width = signatureCanvas.width;
+            const signBtn = document.getElementById('sign-submit-btn');
+            if (signBtn) signBtn.disabled = true;
+          }
           setTimeout(() => initSignatureCanvas(), 100);
         } else if (screenId === 'screen-top') {
           resetAppState();
@@ -13266,6 +13284,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       });
     }
 
+    // 受付完了画面（screen-complete）の「終了して最初に戻る」ボタン用。
+    // 【目的】面会証の保存は「印刷する」ボタンを押した時に初めて行う仕様にしたため、
+    // 印刷せずにこのボタンを押すと、受付記録が一切残らない（＝受付そのものが無かった
+    // ことになる）。押し間違い・印刷し忘れによる記録消失を防ぐため、まだ保存されて
+    // いない状態でこのボタンが押された場合は、その旨を確認してから進める。
+    // 【メッセージについて】「受付記録は保存されません」という表現は、システム内部の
+    // 都合であって面会者にはピンとこない。面会者・係員にとって実際に困るのは
+    // 「面会証（＝退館時に必要なQRコード）が発行されない」ことなので、その点を
+    // 直接伝える文言にしている。
+    // （20秒経過による自動リセットの場合は、その場に人がいない前提のため確認は挟まない＝
+    // startIdleTimer から直接 goTop() を呼ぶ経路はそのまま残している。）
+    function finishCompleteScreen() {
+      if (AppState.currentScreen === 'screen-complete' && AppState.lastVisitRecord && !AppState.lastVisitRecord.saved) {
+        const ok = confirm('面会証を印刷せずに終了します。\n退館の際に必要な面会証（QRコード）が発行されません。よろしいですか？');
+        if (!ok) return;
+      }
+      goTop();
+    }
+
     function goTop() {
       // TOP画面に戻る前に、すべての表示をクリア（重複削除も含む）
       document.getElementById('pass-room').textContent = '';
@@ -13338,6 +13375,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       const password = document.getElementById('admin-password').value;
       const correctPassword = '1234'; // 仮のパスワード
       if (password === correctPassword) {
+        // ログインするたびに「🗑 削除済みを表示」はOFFの状態から始める
+        // （🔄 更新ボタンでは表示モードを維持したいので、リセットはここだけで行う）。
+        AdminViewState.showDeleted = false;
+        const trashBtn = document.getElementById('admin-trash-toggle-btn');
+        if (trashBtn) trashBtn.textContent = '🗑 削除済みを表示';
         loadAdminDashboard();
         showScreen('screen-admin-dashboard');
       } else {
@@ -13384,10 +13426,31 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
     }
 
-    function buildAdminRow(entry, master) {
+    function buildAdminRow(entry, master, trashView) {
       const patientName = resolvePatientDisplayName(entry, master);
       const checkoutStatus = entry.checkoutTime ? '退館済' : '滞在中';
       const checkoutBgColor = entry.checkoutTime ? '#E8F5E9' : '#FFEBEE';
+      let actionCell;
+      if (trashView) {
+        // 【削除済み一覧について】誤って正当な記録を削除してしまった場合に備え、削除は
+        // 完全に消してしまう（取り消し不可）のではなく「削除フラグを立てるだけ」の
+        // ソフトデリートにしている。この一覧（🗑 削除済みを表示）から「復元」できる
+        // （adminRestoreEntry参照）。
+        actionCell = `<td class="col-nowrap" style="text-align: center;"><button onclick="adminRestoreEntry('${entry.visitId}')" style="padding: 3px 8px; font-size: 11px; background-color: var(--color-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">復元</button></td>`;
+      } else {
+        // 【退館処理ボタンについて】面会証の印刷ボタンを押していない（＝そもそも履歴に
+        // 保存されない）場合はこの行自体が存在しないので通常は問題にならないが、印刷は
+        // したものの退館時にQRコード（面会証）を紛失した等のケースの保険として、
+        // 管理画面から係員が直接「退館済み」に切り替えられるようにする（adminManualCheckout参照）。
+        // 既に退館済みの行では誤操作防止のためボタンを出さない。
+        // 【削除ボタンについて】印刷ミス・二重登録・お部屋間違い等で不要になった記録を、
+        // 係員が管理画面から削除できるようにする（adminDeleteEntry参照）。状態に関わらず表示する。
+        const checkoutBtn = entry.checkoutTime
+          ? ''
+          : `<button onclick="adminManualCheckout('${entry.visitId}')" style="padding: 3px 8px; font-size: 11px; background-color: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px;">退館処理</button>`;
+        const deleteBtn = `<button onclick="adminDeleteEntry('${entry.visitId}')" style="padding: 3px 8px; font-size: 11px; background-color: white; color: var(--color-alert); border: 1px solid var(--color-alert); border-radius: 4px; cursor: pointer;">削除</button>`;
+        actionCell = `<td class="col-nowrap" style="text-align: center; white-space: nowrap;">${checkoutBtn}${deleteBtn}</td>`;
+      }
 
       // 【入館時間の列が「西暦の日付＋時刻」を1列に詰め込んでいた問題の修正】
       // 以前は「2026年08月13日(木) 07時17分」のように日付と時刻が1つの列に混在しており、
@@ -13417,8 +13480,86 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           <td class="col-nowrap">${checkin.time}</td>
           <td class="col-nowrap">${checkoutDisplay}</td>
           <td class="col-nowrap" style="background-color: ${checkoutBgColor}; text-align: center; font-weight: 600;">${checkoutStatus}</td>
+          ${actionCell}
         </tr>
       `;
+    }
+
+    // 管理画面から係員が手動で退館処理を行う（面会証（QRコード）を紛失した、
+    // 汚損して読み取れない等で、退館手続き画面（QRスキャン／手入力どちらも）が
+    // 使えない来訪者向けの保険）。
+    // commitCheckout() と処理内容は同じ（退館時刻の記録・保存）だが、こちらは来訪者向けの
+    // 「退館手続き完了」画面は表示せず、確認ダイアログの上で管理画面のテーブルをその場で
+    // 更新するだけにとどめる（係員がその場で操作し、来訪者は関与しないため）。
+    function adminManualCheckout(visitId) {
+      const log = getVisitLog();
+      const entry = log.find(e => e.visitId === visitId);
+      if (!entry) return;
+      if (entry.checkoutTime) return; // 二重クリック等の保険（既に退館済み）
+      if (entry.deleted) return; // 保険（削除済みの記録は対象外）
+
+      const master = fetchPatientMaster();
+      const patient = master.find(p => p.patientId === entry.patientId);
+      const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji || ''}` : resolvePatientDisplayName(entry, master);
+      const roomNo = patient ? patient.roomNo : entry.roomNo;
+
+      const ok = confirm(`受付番号 ${entry.visitId}\n${roomNo}号室 ${patientName}様への面会者を、退館済みとして記録します。\nよろしいですか？`);
+      if (!ok) return;
+
+      const now = new Date();
+      entry.checkoutTime = formatTimestamp(now);
+      entry.checkoutTimestamp = now.toISOString();
+      const saved = persistVisitLog(log);
+      if (!saved) return;
+
+      renderAdminTable();
+    }
+
+    // 管理画面から係員が記録を削除する。
+    // 【用途】受付は「面会証を印刷する」ボタンを押した時点で確定保存される仕様のため、
+    // 例えば「印刷はできたがお部屋番号を間違えていた」「同じ方が誤って2回登録してしまった」
+    // といったケースで、不要になった記録を管理画面から削除できるようにする。
+    // 【ソフトデリートにした理由】スタッフが誤って正当な記録を削除してしまう可能性を
+    // 考慮し、localStorage からレコードを完全に消す（取り消し不可）のではなく、
+    // deleted フラグを立てて通常の一覧から隠すだけにしている。削除した記録は
+    // 「🗑 削除済みを表示」から確認・復元できる（adminRestoreEntry参照）。
+    function adminDeleteEntry(visitId) {
+      const log = getVisitLog();
+      const entry = log.find(e => e.visitId === visitId);
+      if (!entry) return;
+
+      const master = fetchPatientMaster();
+      const patientName = resolvePatientDisplayName(entry, master);
+
+      const ok = confirm(`受付番号 ${entry.visitId}\n${entry.roomNo}号室 ${patientName}様 の記録を削除します。\n（誤って削除した場合は「🗑 削除済みを表示」から元に戻せます）\nよろしいですか？`);
+      if (!ok) return;
+
+      entry.deleted = true;
+      entry.deletedAt = new Date().toISOString();
+      const saved = persistVisitLog(log);
+      if (!saved) return;
+
+      renderAdminTable();
+    }
+
+    // 「🗑 削除済みを表示」から、誤って削除した記録を元に戻す。
+    function adminRestoreEntry(visitId) {
+      const log = getVisitLog();
+      const entry = log.find(e => e.visitId === visitId);
+      if (!entry) return;
+
+      const master = fetchPatientMaster();
+      const patientName = resolvePatientDisplayName(entry, master);
+
+      const ok = confirm(`受付番号 ${entry.visitId}\n${entry.roomNo}号室 ${patientName}様 の記録を元に戻します。\nよろしいですか？`);
+      if (!ok) return;
+
+      delete entry.deleted;
+      delete entry.deletedAt;
+      const saved = persistVisitLog(log);
+      if (!saved) return;
+
+      renderAdminTable();
     }
 
     // 管理画面テーブルの並び替え状態。
@@ -13449,7 +13590,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       { key: 'checkin', label: '面会日' },
       { key: 'checkin', label: '入館時間' },
       { key: 'checkout', label: '退館時間' },
-      { key: 'status', label: '状態' }
+      { key: 'status', label: '状態' },
+      { key: null, label: '操作' }
     ];
 
     function getAdminSortValue(entry, master, key) {
@@ -13507,6 +13649,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       }).join('');
     }
 
+    // 管理画面の表示状態（🗑 削除済みを表示のON/OFF）。
+    let AdminViewState = { showDeleted: false };
+
+    function toggleAdminTrashView() {
+      AdminViewState.showDeleted = !AdminViewState.showDeleted;
+      const btn = document.getElementById('admin-trash-toggle-btn');
+      if (btn) {
+        btn.textContent = AdminViewState.showDeleted ? '🗑 通常の一覧に戻る' : '🗑 削除済みを表示';
+        btn.style.backgroundColor = AdminViewState.showDeleted ? '#eee' : '';
+      }
+      renderAdminTable();
+    }
+
     function getFilteredAdminEntries(log, master) {
       const floor = document.getElementById('admin-filter-floor').value;
       const room = document.getElementById('admin-filter-room').value;
@@ -13514,6 +13669,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       const patient = document.getElementById('admin-filter-patient').value;
 
       return log.filter(entry => {
+        // 【ソフトデリートについて】通常表示では削除済みの記録を除外し、
+        // 「🗑 削除済みを表示」がONの時は逆に削除済みの記録だけを表示する。
+        if (AdminViewState.showDeleted) {
+          if (!entry.deleted) return false;
+        } else {
+          if (entry.deleted) return false;
+        }
         // フロア検索：部屋番号の頭の数字
         if (floor && entry.roomNo.charAt(0) !== floor) return false;
         // 部屋番号検索
@@ -13552,23 +13714,29 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
       if (headRow) headRow.innerHTML = buildAdminHeaderRow();
 
-      if (log.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="padding: 15px; text-align: center; color: #999;">訪問記録なし</td></tr>';
+      // 【ソフトデリート対応】log.length には削除済みの記録も含まれるため、
+      // 「記録が全く無い」かどうかは表示モード（通常／削除済み）に応じた
+      // 母集団の件数で判定する。
+      const visibleLog = log.filter(e => AdminViewState.showDeleted ? !!e.deleted : !e.deleted);
+      if (visibleLog.length === 0) {
+        const emptyMsg = AdminViewState.showDeleted ? '削除済みの記録はありません' : '訪問記録なし';
+        tbody.innerHTML = `<tr><td colspan="11" style="padding: 15px; text-align: center; color: #999;">${emptyMsg}</td></tr>`;
         return;
       }
 
       const filtered = sortAdminEntries(getFilteredAdminEntries(log, master), master);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="padding: 15px; text-align: center; color: #999;">該当記録なし</td></tr>';
         return;
       }
 
-      tbody.innerHTML = filtered.map(entry => buildAdminRow(entry, master)).join('');
+      tbody.innerHTML = filtered.map(entry => buildAdminRow(entry, master, AdminViewState.showDeleted)).join('');
     }
 
     function loadAdminDashboard() {
       renderAdminTable();
+      updateBackupButtonAvailability();
     }
 
     function applyAdminFilters() {
@@ -13976,6 +14144,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     // （手動の「💾 バックアップを保存」ボタンと、自動バックアップの両方から使う）。
     function buildVisitLogBackupPayload() {
       const log = getVisitLog();
+      // 【削除済み記録をバックアップから除外する理由】管理画面で「削除」した記録
+      // （誤登録・重複登録など、不要と判断されたもの）は、ソフトデリート
+      // （deletedフラグを立てるだけ）で localStorage 上には残しているが、
+      // バックアップという「必要な記録を保全するための保険」には含める必要がない
+      // と判断し、ここで除外している。誤って削除してしまった記録を元に戻したい場合は、
+      // バックアップから復元するのではなく、管理画面の「🗑 削除済みを表示」→「復元」を
+      // 使うこと（localStorage上にそのまま残っているため、そちらの方が確実）。
+      const activeLog = log.filter(entry => !entry.deleted);
       const patientMaster = fetchPatientMaster();
       const now = new Date();
       const pad = n => String(n).padStart(2, '0');
@@ -13983,8 +14159,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       const backup = {
         exportedAt: now.toISOString(),
         appName: '病院受付システム',
-        note: 'vms_visit_log（面会履歴）と vms_patient_master（患者マスタ）の内容をそのまま書き出したバックアップです。このファイルからの自動復元機能は現時点ではありません。',
-        visitLog: log,
+        note: 'vms_visit_log（面会履歴／削除済みの記録は含みません）と vms_patient_master（患者マスタ）の内容を書き出したバックアップです。このファイルからの自動復元機能は現時点ではありません。',
+        visitLog: activeLog,
         patientMaster: patientMaster
       };
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -14007,21 +14183,66 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
+    // 【iPad判定について】
+    // iPad(iPadOS 13以降)のSafariは、既定で「PC向けサイトを表示」する設定になっており、
+    // navigator.userAgent に "iPad" という文字列を含まず Mac と見分けがつかない
+    // （"Macintosh; Intel Mac OS X..." のように見える）。そのため、タッチ操作に対応した
+    // "Macintosh" として振る舞う端末（= 実質iPadである可能性が高い）を
+    // navigator.maxTouchPoints で追加判定する。稀に将来のタッチ対応Macと誤判定する
+    // 可能性はゼロではないが、現状これが最も実用的な判定方法。
+    function isProbablyIPad() {
+      const ua = navigator.userAgent || '';
+      if (/iPad/.test(ua)) return true;
+      if (/Macintosh/.test(ua) && navigator.maxTouchPoints && navigator.maxTouchPoints > 1) return true;
+      return false;
+    }
+
+    // 管理画面の「💾 バックアップを保存」ボタンの状態（有効/無効・案内文言）を、
+    // 管理画面を開くたび（loadAdminDashboard）に反映する。
+    // 【iPadで無効化する理由】iPadのブラウザ（Safari等）ではBlobファイルのダウンロード時に
+    // 保存先の選択や共有シートが出るなど挙動がPCと異なり、意図した保存先に確実に
+    // 保存できる保証がない。バックアップは「いざという時に開発担当者が中身を見て
+    // 手作業で復旧するための保険」という位置づけであり、保存できたかどうか曖昧なままでは
+    // 保険として機能しない。そのため、iPadでは操作自体をできないようにし、
+    // 「PCで行ってください」と案内する（バックアップ以外の管理画面の閲覧・検索等の
+    // 機能はiPadでも通常どおり利用できる）。
+    function updateBackupButtonAvailability() {
+      const btn = document.getElementById('admin-backup-btn');
+      const help = document.getElementById('admin-backup-help');
+      if (!btn || !help) return;
+      if (isProbablyIPad()) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+        help.textContent = 'iPadではバックアップの保存はできません。バックアップが必要な場合はPCの管理画面から行ってください。';
+      } else {
+        btn.disabled = false;
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+        help.textContent = 'この端末に保存されている面会履歴（削除済みの記録は含みません）を、日時入りのファイル名でダウンロードします（保存先はブラウザの「ダウンロード」フォルダです。USBメモリへの保存はできません）。';
+      }
+    }
+
     // 管理画面の「💾 バックアップを保存」ボタン用。
-    // 【目的】この端末（PC/タブレット）がフリーズ・故障した場合や、誤操作でデータが
+    // 【目的】この端末（PC）がフリーズ・故障した場合や、誤操作でデータが
     // 壊れてしまった場合に備え、管理者が任意のタイミングで面会履歴・患者マスタを
     // ファイルとして書き出せるようにする。
     // 【保存先について】ブラウザの標準ダウンロード機能（<a download>）を使っているため、
     // 保存先はブラウザ側の設定に従う（Windows PCのEdge/Chromeでは通常「ダウンロード」
     // フォルダ）。USBメモリへの保存は運用上禁止されているため、案内文言・想定運用からも
-    // USBメモリの記載は外している。iPad等タブレットのブラウザではダウンロード時の挙動が
-    // 異なる（保存先の選択や共有シートが出る、あるいはfile://上のBlobダウンロードが
-    // 期待通り動かない可能性がある）ため、iPadで管理画面を使う場合は事前に動作確認が必要。
+    // USBメモリの記載は外している。
+    // 【PC限定にした理由】iPad等タブレットのブラウザではダウンロード時の挙動がPCと異なり
+    // 確実に保存できる保証がないため、updateBackupButtonAvailability() でiPadでは
+    // ボタン自体を無効化している。ここでも念のため二重にガードする。
     // 【現状の位置づけ】これは「取り込み（復元）」機能とセットではなく、あくまで
     // 万一の際に開発担当者が中身（JSONテキスト）を見て手作業で復旧するための保険。
     // オフライン単一HTMLアプリのため、サーバー等へは一切送信せず、この端末上で
     // ファイルとして書き出すだけ。
     function downloadVisitLogBackup() {
+      if (isProbablyIPad()) {
+        alert('iPadではバックアップの保存はできません。PCの管理画面から行ってください。');
+        return;
+      }
       let payload;
       try {
         payload = buildVisitLogBackupPayload();
@@ -14215,7 +14436,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     function renderConfirm() {
       const p = AppState.selectedPatient;
-      document.getElementById('confirm-content').innerHTML = `<div class="confirm-room">${p.roomNo} 号室</div><div class="confirm-name">${p.lastNameKanji}　様</div>`;
+      // 【フルネーム表示について】この画面は「部屋番号＋姓」で検索して見つかった患者様が
+      // 本当にご本人（お捜しの方）かどうかを面会者自身が確認するための画面。
+      // 同姓の別患者様（同室・別室問わず）と取り違えないよう、ここだけはフルネームで表示し、
+      // 一致確認の精度を優先する。面会証の印刷・退館手続き画面など、他者の目に触れる
+      // 可能性がある場面ではプライバシー配慮のため姓のみ表示にしている（printLabel・
+      // requestCheckoutConfirmation・commitCheckout 付近のコメント参照）。
+      document.getElementById('confirm-content').innerHTML = `<div class="confirm-room">${p.roomNo} 号室</div><div class="confirm-name">${p.lastNameKanji}${p.firstNameKanji || ''}　様</div>`;
     }
 
     function updateClock() {
@@ -14352,9 +14579,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     }
 
     function printLabel() {
-      // 訪問記録は screen-complete 表示時（submitNewVisit）で既に保存済みのため、
-      // ここで再度 saveVisitLog() を呼ぶと同じ受付番号のレコードが重複登録されてしまう。
-      // 印刷は保存済みの面会証を印刷するだけの処理とする。
+      // 【保存タイミングについて】面会ログの保存は、この「面会証を印刷する」ボタンが
+      // 押された時に初めて行う（運用方針：印刷して初めて受付完了として記録する）。
+      // 【重要：紙切れ等の印刷失敗時も記録は残る】保存（saveVisitLog）は必ず
+      // window.print() より前に行っている。そのため「用紙が切れていて実際には
+      // 紙が出てこなかった」「プリンターの調子が悪く途中で止まった」といった、
+      // 印刷ボタンは押したが物理的な印刷自体が失敗したケースでも、履歴には
+      // 既に保存されている（管理画面にも「滞在中」として表示される）。退館時に
+      // 面会証（QRコード）が無くても、管理画面の「退館処理」ボタンで対応できる。
+      // 記録が一切残らないのは「印刷ボタン自体を押さなかった」場合のみ。
+      // 【二重保存防止】印刷ボタンを連打した場合や、印刷プレビューを閉じてもう一度
+      // 押した場合に、同じ受付番号のレコードが重複して保存されないよう、まだ保存して
+      // いない場合のみ saveVisitLog() を呼ぶ（AppState.lastVisitRecord.saved で判定）。
+      if (AppState.lastVisitRecord && !AppState.lastVisitRecord.saved) {
+        const saved = saveVisitLog();
+        // 保存に失敗した場合は印刷させない。保存できていないのに面会証だけ印刷されると、
+        // 「印刷物はあるのに履歴には無い（＝退館手続きもできない）」状態になってしまうため。
+        if (!saved) return;
+        AppState.lastVisitRecord.saved = true;
+      }
       window.print();
     }
 
@@ -14700,9 +14943,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
              <img src="${AppState.signatureData}" style="max-width: 100%; max-height: 120px; border: 2px solid var(--color-border); border-radius: 8px; background: white;">
            </div>`
         : '';
+      // 【フルネーム表示について】新規受付時の確認画面（renderConfirm）と同じ理由で、
+      // 同姓の別患者様との取り違え防止のためフルネームで表示する。
       content.innerHTML = `
         <div class="confirm-room">${patient.roomNo} 号室</div>
-        <div class="confirm-name">${patient.lastNameKanji}　様</div>
+        <div class="confirm-name">${patient.lastNameKanji}${patient.firstNameKanji || ''}　様</div>
         <div style="font-size: var(--fs-sm); margin-top: 10px;">ご関係：${formatRelationLabel(AppState.relation, AppState.relationOther)}</div>
         ${sigHtml}
       `;
@@ -14720,10 +14965,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     function submitNewVisit() {
       const now = new Date();
       const visitId = generateVisitId();
+      // 【保存タイミングについて】以前は「印刷するかどうかに関わらず、この完了画面を
+      // 表示した時点で必ず保存する」仕様にしていた（印刷しなかった来客の記録が
+      // 一切残らないという不具合の対策）。今回、運用方針として「印刷ボタンを押した
+      // ときだけ履歴に残す」形に変更した（印刷に失敗した場合は係員へお申し出いただき、
+      // 改めて受付をやり直す運用とする）。そのため、ここでは面会証の内容を組み立てて
+      // 画面表示するだけにとどめ、実際の保存（saveVisitLog）は printLabel() が
+      // 呼ばれた時に初めて行う。saved フラグで多重保存を防ぐ。
       AppState.lastVisitRecord = {
         visitId: visitId,
         timestamp: now.toISOString(),
-        displayTime: formatTimestamp(now)
+        displayTime: formatTimestamp(now),
+        saved: false
       };
       document.getElementById('pass-room').textContent = `${AppState.selectedPatient.roomNo} 号室`;
       document.getElementById('pass-name').textContent = `${AppState.selectedPatient.lastNameKanji}　様`;
@@ -14747,15 +15000,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         `<span class="pass-id-label">受付番号</span><span class="pass-id-sep">: </span>` +
         `<span class="pass-id-value">${visitId.slice(0, 6)}</span><span class="pass-id-value">${visitId.slice(6)}</span>`;
 
-      // 完了画面の表示タイミングで面会ログを確定保存する（印刷するかどうかに関わらず必須）。
-      // 以前は印刷ボタン押下時のみ保存しており、印刷しなかった来客は退館時にスキャンしても
-      // 「受付番号が見つかりません」となり、管理画面にも記録が残らない不具合があった。
-      // 【重要】保存に失敗した場合は screen-complete に進ませない。保存できていないのに
-      // 「受付完了」と表示してしまうと、受付されたと思って帰ってしまい、記録も残らず、
-      // 退館時のスキャンも失敗するという最悪の状態になるため。
-      const saved = saveVisitLog();
-      if (!saved) return;
-
+      // 面会ログの保存は行わず、そのまま完了画面（面会証プレビュー）を表示する。
+      // 保存は printLabel()（「面会証を印刷する」ボタン）が押された時に行う。
       showScreen('screen-complete');
     }
 
@@ -14774,7 +15020,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     function requestCheckoutConfirmation(visitId) {
       const log = getVisitLog();
-      const entry = log.find(e => e.visitId === visitId);
+      // 削除済み（ソフトデリート）の記録は「無かったこと」として扱い、退館手続きの
+      // 対象にはしない。
+      const entry = log.find(e => e.visitId === visitId && !e.deleted);
       const resultDiv = document.getElementById('checkout-result');
 
       if (!visitId) return;
@@ -14791,10 +15039,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
       const master = fetchPatientMaster();
       const patient = master.find(p => p.patientId === entry.patientId);
-      // 【プライバシー配慮】受付側（確認画面・受付票）ではフルネームを表示せず「姓＋様」のみに
-      // しているのに合わせ、退館手続き画面（周囲から画面が見える可能性がある）でも
-      // フルネームは表示せず姓のみにする。
-      const patientName = patient ? `${patient.lastNameKanji}` : '不明';
+      // 【フルネーム表示について】退館手続きは面会証（QRコード）を持つご本人が手続きする
+      // 場面であり、姓のみだと同姓の別患者様（同室・別室問わず）と取り違えて誤った方を
+      // 退館扱いにしてしまう恐れがある。取り違え防止を優先し、ここはフルネームで表示する。
+      // 印刷物（面会証）は持ち歩かれ他者の目に触れやすいため姓のみのままにしている
+      // （printLabel / submitNewVisit 付近のコメント参照）。
+      const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji || ''}` : '不明';
 
       // スクロールなしで確認内容が見えるよう、スキャン枠・手入力欄は非表示にする
       document.getElementById('checkout-scan-view').style.display = 'none';
@@ -14823,7 +15073,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       // 実際に退館時刻を記録して保存し、完了パネルを表示する共通処理。
       // QRスキャン（即時）と手入力（確認後）の両方から呼ばれる。
       const log = getVisitLog();
-      const entry = log.find(e => e.visitId === visitId);
+      // 削除済み（ソフトデリート）の記録は退館手続きの対象にしない。
+      const entry = log.find(e => e.visitId === visitId && !e.deleted);
       const resultDiv = document.getElementById('checkout-result');
 
       if (!entry) {
@@ -14857,10 +15108,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       // 完了パネルを表示
       const master = fetchPatientMaster();
       const patient = master.find(p => p.patientId === entry.patientId);
-      // 【プライバシー配慮】受付側（確認画面・受付票）ではフルネームを表示せず「姓＋様」のみに
-      // しているのに合わせ、退館手続き画面（周囲から画面が見える可能性がある）でも
-      // フルネームは表示せず姓のみにする。
-      const patientName = patient ? `${patient.lastNameKanji}` : '不明';
+      // 【フルネーム表示について】requestCheckoutConfirmation() と同じ理由で、退館手続きの
+      // 完了画面も同姓の別患者様との取り違え防止のためフルネームで表示する。
+      const patientName = patient ? `${patient.lastNameKanji}${patient.firstNameKanji || ''}` : '不明';
 
       // 【表示崩れの修正】以前はQRスキャン待ち受け表示（大きなアイコン枠）を残したまま
       // その下に完了メッセージを追加していたため、画面に収まりきらず「退館手続き完了」を
