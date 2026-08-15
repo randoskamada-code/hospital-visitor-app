@@ -14637,21 +14637,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       return `${y}年${m}月${d}日(${dayNames[date.getDay()]}) ${h}時${min}分`;
     }
 
-    function initSignatureCanvas() {
-      if (signatureCanvas) {
-        // 【署名クリアバグの根本原因】
-        // 2人目以降の来客が screen-sign に入るたびにこの関数が呼ばれるが、
-        // 従来は「初期化済みなら即 return」となっており、Canvas のピクセルが
-        // 一度も再クリアされていなかった（イベントリスナーの二重登録を防ぐ
-        // ためのガードが、クリア処理まで一緒にスキップしてしまっていた）。
-        // そのため前の来客の手書きストロークが物理的にCanvas上に残り続け、
-        // 次の来客が署名すると前回分と重なって表示・保存されていた。
-        // 修正：初期化済みの場合でも clearSignature() で必ず白紙に戻す。
-        clearSignature();
-        return;
-      }
-      signatureCanvas = document.getElementById('signature-canvas');
-      signatureCtx = signatureCanvas.getContext('2d');
+    // Canvasのサイズ(dpr倍した実ピクセル数)・拡大率・線のスタイル(太さ／線端／白紙塗り)を
+    // まとめて設定する。screen-sign に入るたびに必ずこれを呼び直す必要がある。
+    //
+    // 【重要】showScreen() の screen-sign 分岐では、前回の署名が一瞬見えてしまう不具合の
+    // 対策として `signatureCanvas.width = signatureCanvas.width;` という自己代入で即座に
+    // Canvas をクリアしている。ところが Canvas の width/height への代入は、たとえ同じ値で
+    // あっても描画内容を消すだけでなく、2D コンテキストの状態（scale() で設定した拡大率、
+    // lineWidth・lineCap・lineJoin・strokeStyle など）も丸ごと初期値にリセットしてしまう
+    // という仕様がある。そのため以前は、2人目以降の来客が署名画面に入るたびに拡大率が
+    // 失われ（devicePixelRatio が1でない環境では、書いた位置が実際のペン先の位置から
+    // ずれる）、線の太さも既定値の1px・線端も既定の'butt'に戻ってしまい（線が細く見える）、
+    // という不具合が発生していた（「2回目以降の面会」で「書き直す」を押した場合など、
+    // 2回目以降に screen-sign へ遷移する経路すべてで再現する）。
+    // 修正：初期化済みかどうかに関わらず、screen-sign に入るたびに必ずこの関数で
+    // サイズ・拡大率・線のスタイルを毎回フルに設定し直す。
+    function configureSignatureCanvas() {
       const dpr = window.devicePixelRatio || 1;
       const rect = signatureCanvas.getBoundingClientRect();
       signatureCanvas.width = rect.width * dpr;
@@ -14663,6 +14664,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       signatureCtx.lineWidth = 4;
       signatureCtx.lineCap = 'round';
       signatureCtx.lineJoin = 'round';
+    }
+
+    function initSignatureCanvas() {
+      if (signatureCanvas) {
+        // 2人目以降の来客が screen-sign に入るたびにこの関数が呼ばれる。
+        // イベントリスナーの二重登録を避けるため再登録はしないが、サイズ・拡大率・
+        // 線のスタイルは configureSignatureCanvas() で必ず毎回フルに再設定する
+        // （詳しい経緯は configureSignatureCanvas() 側のコメントを参照）。
+        configureSignatureCanvas();
+        return;
+      }
+      signatureCanvas = document.getElementById('signature-canvas');
+      signatureCtx = signatureCanvas.getContext('2d');
+      configureSignatureCanvas();
 
       signatureCanvas.addEventListener('touchstart', (e) => {
         isDrawing = true;
