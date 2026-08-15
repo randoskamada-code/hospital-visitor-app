@@ -41,7 +41,13 @@
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
     body { margin: 0; padding: 0; font-family: -apple-system, "Hiragino Sans", "ヒラギノ角ゴシック", sans-serif; background-color: var(--color-bg); color: var(--color-text); font-size: 16px; line-height: 1.5; }
-    #app { width: 100vw; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    /* 【Chrome/Safariでの見え方の違いについて】画面の高さを100vhで指定していたが、iPadでは
+       Safariの方がツールバー分を差し引いた実際の表示領域が広く取れる一方、Chromeでは
+       ツールバー等が含まれる分だけ100vhが実際に見える範囲より大きくなり、本来スクロール不要な
+       画面でも下側が見切れてスクロールが必要になることがある。dvh（動的ビューポート高さ）に
+       対応したブラウザでは、実際に見えている範囲に合わせて自動的に調整される100dvhを優先させ、
+       対応していない古いブラウザ向けには100vhをフォールバックとして残す。 */
+    #app { width: 100vw; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     #app-header { background-color: var(--color-primary); color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-sm); flex-shrink: 0; font-weight: 600; }
     #header-title { font-size: var(--fs-md); }
     #header-clock { font-size: var(--fs-xs); }
@@ -295,9 +301,13 @@
       <section class="screen" id="screen-blocked">
         <div class="screen-content">
           <div class="warning-icon">⚠</div>
+          <!-- 【文言について】受付端末は受付窓口のすぐ前に設置されているため、来館者は既に
+               窓口の目の前にいる状態でこの画面を見ることになる。以前の「1階受付窓口へお越しください」
+               という文言は、まるで別の場所へ移動するよう案内しているように読めておかしいという
+               指摘を受け、「その場で係の者にお声がけください」という趣旨に変更した。 -->
           <div style="font-size: var(--fs-md); margin: 20px 0; text-align: center;">恐れ入りますが</div>
-          <div class="restricted-message">1階 受付窓口へ<br>お越しください</div>
-          <div class="restricted-sub">係の者がご案内いたします</div>
+          <div class="restricted-message">窓口の係の者へ<br>お声がけください</div>
+          <div class="restricted-sub">確認のうえご案内いたします</div>
           <button class="btn-large no-print" onclick="goTop()">最初に戻る</button>
           <div class="timer-text">(15秒後に自動で戻ります)</div>
         </div>
@@ -734,61 +744,30 @@
                 <div id="restriction-rules-list" style="margin-bottom: 15px;"></div>
                 <div style="border-top: 1px solid var(--color-border); padding-top: 12px;">
                   <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">＋ 許可ルールを追加</div>
-                  <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
-                    <select id="restriction-rule-relation" style="padding: 6px; border: 1px solid var(--color-border); border-radius: 6px;">
-                      <option value="ANY_FAMILY">ご家族全般（続柄を問わず）</option>
-                      <option value="夫">夫</option>
-                      <option value="妻">妻</option>
-                      <option value="父">父</option>
-                      <option value="母">母</option>
-                      <option value="子">子（長男・次男等を問わず）</option>
-                      <option value="長男">長男</option>
-                      <option value="次男">次男</option>
-                      <option value="三男以降">三男以降</option>
-                      <option value="長女">長女</option>
-                      <option value="次女">次女</option>
-                      <option value="三女以降">三女以降</option>
-                      <option value="息子の嫁">息子の嫁（子の配偶者）</option>
-                      <option value="娘の婿">娘の婿（子の配偶者）</option>
-                      <option value="孫">孫</option>
-                      <option value="ひ孫">ひ孫</option>
-                      <option value="兄">兄</option>
-                      <option value="弟">弟</option>
-                      <option value="姉">姉</option>
-                      <option value="妹">妹</option>
-                      <option value="甥">甥</option>
-                      <option value="姪">姪</option>
-                      <option value="義父">義父（配偶者の父）</option>
-                      <option value="義母">義母（配偶者の母）</option>
-                      <option value="義兄">義兄</option>
-                      <option value="義姉">義姉</option>
-                      <option value="義弟">義弟</option>
-                      <option value="義妹">義妹</option>
-                      <option value="父方の祖父">父方の祖父</option>
-                      <option value="父方の祖母">父方の祖母</option>
-                      <option value="父方の伯父">父方の伯父</option>
-                      <option value="父方の叔父">父方の叔父</option>
-                      <option value="父方の伯母">父方の伯母</option>
-                      <option value="父方の叔母">父方の叔母</option>
-                      <option value="父方の従兄弟">父方の従兄弟</option>
-                      <option value="父方の従姉妹">父方の従姉妹</option>
-                      <option value="母方の祖父">母方の祖父</option>
-                      <option value="母方の祖母">母方の祖母</option>
-                      <option value="母方の伯父">母方の伯父</option>
-                      <option value="母方の叔父">母方の叔父</option>
-                      <option value="母方の伯母">母方の伯母</option>
-                      <option value="母方の叔母">母方の叔母</option>
-                      <option value="母方の従兄弟">母方の従兄弟</option>
-                      <option value="母方の従姉妹">母方の従姉妹</option>
-                      <option value="後見人">後見人</option>
-                      <option value="友人・知人">友人・知人</option>
-                      <option value="職場関係者">職場関係者</option>
-                      <option value="ケアマネジャー・施設関係者">ケアマネジャー・施設関係者</option>
-                    </select>
-                    <label style="font-size: 13px; display: flex; align-items: center; gap: 4px;"><input type="checkbox" id="restriction-rule-identity-check"> 本人確認が必要（同姓・氏名指定などがある場合）</label>
+                  <!-- 【改善】以前は45個ほどの続柄を1本の長い一覧（select）から選ぶ形だったため、
+                       目的の続柄を探すのに一覧を下までスクロールする必要があった。来館者向けの
+                       「患者さまとのご関係をお選びください」画面と同じ「大分類→詳細」の2段階選択に
+                       変更し、1画面あたりの選択肢を最大8個程度に抑えてスクロールをなくした。
+                       また「息子の嫁」「娘の婿」を独立した選択肢として一覧に並べるのをやめ、
+                       「子」の分類を選んだ時だけ現れるチェックボックス「配偶者も含める」に統合した
+                       （データ上は今まで通り別々のルールとして保存されるため、判定ロジック側の
+                       変更は不要）。 -->
+                  <div id="restriction-category-view">
+                    <div style="font-size: 12px; color: var(--color-text-sub); margin-bottom: 6px;">① どなたとのご関係かを選んでください</div>
+                    <div id="restriction-category-buttons" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;"></div>
                   </div>
-                  <input type="text" id="restriction-rule-note" placeholder="スタッフ向けメモ（例：次男様（木村姓）のみ面会可）" style="width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: 6px; box-sizing: border-box; margin-bottom: 8px;">
-                  <button onclick="addRestrictionRule()" style="padding: 8px 16px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">このルールを追加</button>
+                  <div id="restriction-detail-view" style="display: none;">
+                    <button type="button" onclick="backToRestrictionCategory()" style="padding: 6px 10px; background: white; border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; font-size: 12px; margin-bottom: 8px;">← ご関係を選び直す</button>
+                    <div id="restriction-detail-category-label" style="font-size: 12px; color: var(--color-text-sub); margin-bottom: 6px;"></div>
+                    <div id="restriction-detail-buttons" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px;"></div>
+                    <label id="restriction-child-spouse-label" style="display: none; align-items: center; gap: 4px; margin-bottom: 8px; font-size: 13px;"><input type="checkbox" id="restriction-include-child-spouse"> このお子様の配偶者（お嫁さん・婿さん）も対象に含める</label>
+                    <div id="restriction-selected-relation-display" style="display: none; font-size: 13px; font-weight: 600; margin-bottom: 8px; padding: 8px; background: #f5f5f5; border-radius: 6px;"></div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
+                      <label style="font-size: 13px; display: flex; align-items: center; gap: 4px;"><input type="checkbox" id="restriction-rule-identity-check"> 本人確認が必要（同姓・氏名指定などがある場合）</label>
+                    </div>
+                    <input type="text" id="restriction-rule-note" placeholder="スタッフ向けメモ（例：次男様（木村姓）のみ面会可）" style="width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: 6px; box-sizing: border-box; margin-bottom: 8px;">
+                    <button id="restriction-add-rule-btn" onclick="addRestrictionRule()" disabled style="padding: 8px 16px; background-color: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">このルールを追加</button>
+                  </div>
                 </div>
               </div>
 
@@ -15004,7 +14983,92 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     // ============================================================
     // 管理画面：面会制限ルールの設定
     // ============================================================
-    let RestrictionModalState = { selectedPatientId: null };
+    let RestrictionModalState = { selectedPatientId: null, selectedCategoryIndex: null, selectedRelation: null };
+
+    // 【管理画面：面会制限ルールの続柄選択】来館者向け画面「患者さまとのご関係をお選びください」と
+    // 同じ考え方で、まず大分類（最大12個）を選び、次にその中の詳細（最大8個程度）を選ぶ
+    // 2段階構成にしている。1つの一覧を下までスクロールして探す必要がないようにするため。
+    // v(=value): checkRestriction等の判定ロジックで使う値。l(=label): 画面表示用の文字列。
+    // allowSpouseCheckbox: trueの分類（「子」）だけ、「配偶者も含める」チェックボックスを表示する。
+    const RESTRICTION_RELATION_CATEGORIES = [
+      { label: 'ご家族全般（続柄を問わず）', direct: 'ANY_FAMILY' },
+      { label: '父母', options: [{ v: '父', l: '父' }, { v: '母', l: '母' }] },
+      { label: '配偶者', options: [{ v: '夫', l: '夫' }, { v: '妻', l: '妻' }] },
+      {
+        label: '子', allowSpouseCheckbox: true,
+        options: [
+          { v: '子', l: '子（長男・次男等を問わず）' },
+          { v: '長男', l: '長男' }, { v: '次男', l: '次男' }, { v: '三男以降', l: '三男以降' },
+          { v: '長女', l: '長女' }, { v: '次女', l: '次女' }, { v: '三女以降', l: '三女以降' }
+        ]
+      },
+      { label: '孫・ひ孫', options: [{ v: '孫', l: '孫' }, { v: 'ひ孫', l: 'ひ孫' }] },
+      { label: '兄弟姉妹', options: [{ v: '兄', l: '兄' }, { v: '弟', l: '弟' }, { v: '姉', l: '姉' }, { v: '妹', l: '妹' }] },
+      { label: '甥・姪', options: [{ v: '甥', l: '甥' }, { v: '姪', l: '姪' }] },
+      { label: '配偶者の父母', options: [{ v: '義父', l: '義父（配偶者の父）' }, { v: '義母', l: '義母（配偶者の母）' }] },
+      { label: '配偶者の兄弟姉妹', options: [{ v: '義兄', l: '義兄' }, { v: '義姉', l: '義姉' }, { v: '義弟', l: '義弟' }, { v: '義妹', l: '義妹' }] },
+      { label: '父方のご親族', options: [{ v: '父方の祖父', l: '父方の祖父' }, { v: '父方の祖母', l: '父方の祖母' }, { v: '父方の伯父', l: '父方の伯父' }, { v: '父方の叔父', l: '父方の叔父' }, { v: '父方の伯母', l: '父方の伯母' }, { v: '父方の叔母', l: '父方の叔母' }, { v: '父方の従兄弟', l: '父方の従兄弟' }, { v: '父方の従姉妹', l: '父方の従姉妹' }] },
+      { label: '母方のご親族', options: [{ v: '母方の祖父', l: '母方の祖父' }, { v: '母方の祖母', l: '母方の祖母' }, { v: '母方の伯父', l: '母方の伯父' }, { v: '母方の叔父', l: '母方の叔父' }, { v: '母方の伯母', l: '母方の伯母' }, { v: '母方の叔母', l: '母方の叔母' }, { v: '母方の従兄弟', l: '母方の従兄弟' }, { v: '母方の従姉妹', l: '母方の従姉妹' }] },
+      { label: 'ご家族・ご親族以外の方', options: [{ v: '後見人', l: '後見人' }, { v: '友人・知人', l: '友人・知人' }, { v: '職場関係者', l: '職場関係者' }, { v: 'ケアマネジャー・施設関係者', l: 'ケアマネジャー・施設関係者' }] }
+    ];
+
+    function renderRestrictionCategoryButtons() {
+      const wrap = document.getElementById('restriction-category-buttons');
+      if (!wrap) return;
+      wrap.innerHTML = '';
+      RESTRICTION_RELATION_CATEGORIES.forEach((cat, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = cat.label;
+        btn.style.cssText = 'padding: 10px 6px; border: 1px solid var(--color-border); border-radius: 6px; background: white; cursor: pointer; font-size: 13px; white-space: normal; line-height: 1.3;';
+        btn.onclick = () => selectRestrictionCategory(idx);
+        wrap.appendChild(btn);
+      });
+    }
+
+    function selectRestrictionCategory(idx) {
+      const cat = RESTRICTION_RELATION_CATEGORIES[idx];
+      RestrictionModalState.selectedCategoryIndex = idx;
+      RestrictionModalState.selectedRelation = null;
+      document.getElementById('restriction-category-view').style.display = 'none';
+      document.getElementById('restriction-detail-view').style.display = 'block';
+      document.getElementById('restriction-add-rule-btn').disabled = true;
+      document.getElementById('restriction-selected-relation-display').style.display = 'none';
+      document.getElementById('restriction-child-spouse-label').style.display = cat.allowSpouseCheckbox ? 'flex' : 'none';
+      document.getElementById('restriction-include-child-spouse').checked = false;
+      const detailButtons = document.getElementById('restriction-detail-buttons');
+      detailButtons.innerHTML = '';
+      if (cat.direct) {
+        // 「ご家族全般」のように詳細を持たない分類は、選んだ時点で即座に続柄が確定する
+        document.getElementById('restriction-detail-category-label').textContent = cat.label;
+        chooseRestrictionRelation(cat.direct, cat.label);
+        return;
+      }
+      document.getElementById('restriction-detail-category-label').textContent = cat.label + ' → 詳細を選んでください';
+      cat.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = opt.l;
+        btn.style.cssText = 'padding: 10px 6px; border: 1px solid var(--color-border); border-radius: 6px; background: white; cursor: pointer; font-size: 13px; white-space: normal; line-height: 1.3;';
+        btn.onclick = () => chooseRestrictionRelation(opt.v, opt.l);
+        detailButtons.appendChild(btn);
+      });
+    }
+
+    function chooseRestrictionRelation(value, label) {
+      RestrictionModalState.selectedRelation = value;
+      const disp = document.getElementById('restriction-selected-relation-display');
+      disp.style.display = 'block';
+      disp.textContent = '選択中のご関係：' + label;
+      document.getElementById('restriction-add-rule-btn').disabled = false;
+    }
+
+    function backToRestrictionCategory() {
+      document.getElementById('restriction-category-view').style.display = 'block';
+      document.getElementById('restriction-detail-view').style.display = 'none';
+      RestrictionModalState.selectedCategoryIndex = null;
+      RestrictionModalState.selectedRelation = null;
+    }
 
     function openRestrictionRulesModal() {
       RestrictionModalState.selectedPatientId = null;
@@ -15044,6 +15108,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     function selectRestrictionPatient(patientId) {
       RestrictionModalState.selectedPatientId = patientId;
+      renderRestrictionCategoryButtons();
       document.getElementById('restriction-search-view').style.display = 'none';
       document.getElementById('restriction-edit-view').style.display = 'block';
       renderRestrictionEditView();
@@ -15086,6 +15151,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       `).join('');
       document.getElementById('restriction-rule-note').value = '';
       document.getElementById('restriction-rule-identity-check').checked = false;
+      // ルールの追加・削除のたびに、続柄選択を①の大分類選びからやり直せる状態に戻す
+      backToRestrictionCategory();
     }
 
     function setBlanketRestriction() {
@@ -15116,7 +15183,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       const master = fetchPatientMaster();
       const patient = getSelectedRestrictionPatient(master);
       if (!patient) return;
-      const relation = document.getElementById('restriction-rule-relation').value;
+      const relation = RestrictionModalState.selectedRelation;
+      if (!relation) {
+        alert('①でご関係を選択してください。');
+        return;
+      }
       const requiresIdentityCheck = document.getElementById('restriction-rule-identity-check').checked;
       const note = document.getElementById('restriction-rule-note').value.trim();
       if (!note) {
@@ -15124,11 +15195,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         return;
       }
       if (!patient.restrictionRules) patient.restrictionRules = [];
-      patient.restrictionRules.push({
-        id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-        relation: relation,
-        requiresIdentityCheck: requiresIdentityCheck,
-        note: note
+      // 追加するご関係のリスト。「子」の分類で「配偶者も含める」にチェックが入っている場合は、
+      // 「息子の嫁」「娘の婿」を別々のルールとして併せて登録する（判定ロジック上は今まで通り、
+      // 血縁の子と、その配偶者とを別のルールとして扱う設計を維持している）。
+      const relationsToAdd = [relation];
+      const cat = RESTRICTION_RELATION_CATEGORIES[RestrictionModalState.selectedCategoryIndex];
+      if (cat && cat.allowSpouseCheckbox && document.getElementById('restriction-include-child-spouse').checked) {
+        const sonRelations = ['子', '長男', '次男', '三男以降'];
+        const daughterRelations = ['子', '長女', '次女', '三女以降'];
+        if (sonRelations.includes(relation)) relationsToAdd.push('息子の嫁');
+        if (daughterRelations.includes(relation)) relationsToAdd.push('娘の婿');
+      }
+      relationsToAdd.forEach(r => {
+        patient.restrictionRules.push({
+          id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          relation: r,
+          requiresIdentityCheck: requiresIdentityCheck,
+          note: note
+        });
       });
       patient.restricted = true;
       if (!patient.restrictReason) patient.restrictReason = note;
@@ -15415,7 +15499,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       AppState.idleTimerId = setTimeout(() => { goTop(); }, timeout);
     }
 
-    function resetIdleTimer() { startIdleTimer(); }
+    // 【不具合修正】screen-blocked（面会禁止でお引き止めした画面）では「15秒後に自動で戻ります」
+    // と表示しているが、その15秒のタイマーは startBlockedTimer() で個別にセットしていた一方、
+    // 画面のどこかをタップするたびに呼ばれるこの resetIdleTimer() は常に startIdleTimer()（既定3分）
+    // を呼んでいたため、待っている間に画面のどこかに触れるたびに15秒のはずが3分に延びてしまい、
+    // 実質「自動で戻らない」ように見える不具合があった。screen-blocked にいる間だけは
+    // startBlockedTimer() を呼び直すようにして、タップしても15秒のまま保たれるようにする。
+    function resetIdleTimer() {
+      if (AppState.currentScreen === 'screen-blocked') {
+        startBlockedTimer();
+        return;
+      }
+      startIdleTimer();
+    }
     function startBlockedTimer() {
       if (AppState.idleTimerId) clearTimeout(AppState.idleTimerId);
       AppState.idleTimerId = setTimeout(() => { goTop(); }, 15000);
